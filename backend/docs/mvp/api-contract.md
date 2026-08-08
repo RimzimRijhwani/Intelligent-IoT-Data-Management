@@ -1,6 +1,6 @@
 # API Contract
 
-Use this document as the single source of truth for the MVP API release. It uses the same eight numbered sections and table structure as `BE-API-Contract.pdf`.
+Use this document as the single source of truth for the MVP API release.
 
 ## 1. Contract metadata
 
@@ -20,6 +20,8 @@ Use this document as the single source of truth for the MVP API release. It uses
 - Every endpoint states authentication, validation, failure, and rate-limit behaviour.
 - Every error returns a human-readable message and stable machine-readable code. FE uses `error.code`, not message text.
 - Authentication responses send `Cache-Control: no-store`. Production CORS is an explicit FE origin allow-list with credentials; wildcard CORS is prohibited.
+- FE never stores passwords, OTPs, refresh tokens, or access tokens in local or session storage. The access token remains in memory only.
+- The `iot_refresh` cookie is `HttpOnly`, `Secure` in production, `SameSite=Lax`, and scoped to `Path=/api/auth`.
 
 ## 3. Route inventory
 
@@ -84,7 +86,11 @@ Use this document as the single source of truth for the MVP API release. It uses
 | Invalid / expired OTP | `400` | `OTP_INVALID` / `OTP_EXPIRED` | Keep page active; offer resend when expired. |
 | Resend throttled | `429` | `OTP_RESEND_THROTTLED` | Disable resend until `retryAfterSeconds`. |
 | Reset token invalid / expired | `400` | `RESET_TOKEN_INVALID` / `RESET_TOKEN_EXPIRED` | Offer new reset request. |
+| Permission denied | `403` | `FORBIDDEN` | Show a permission message. |
+| Login throttled | `429` | `LOGIN_THROTTLED` | Disable sign-in until the retry time. |
+| OTP attempts exhausted | `429` | `OTP_ATTEMPTS_EXCEEDED` | Restart login. |
 | Service failure | `502` / `503` | `SERVICE_UNAVAILABLE` | Preserve inputs and offer retry. |
+| Unexpected server failure | `500` | `INTERNAL_ERROR` | Show generic retry state and record `correlationId` when provided. |
 
 ## 6. Endpoint specification
 
@@ -130,6 +136,13 @@ Use this document as the single source of truth for the MVP API release. It uses
 }
 ```
 
+| Failure case | HTTP status / code | Frontend behaviour |
+| --- | --- | --- |
+| Invalid input | `400` / `VALIDATION_ERROR` | Show field errors. |
+| Duplicate email | `409` / `ACCOUNT_EXISTS` | Offer sign-in or password reset. |
+| Service failure | `503` / `SERVICE_UNAVAILABLE` | Show retry state. |
+
+
 ### 6.2 AUTH-02 - POST /api/auth/login
 
 | Field | Value |
@@ -174,7 +187,15 @@ Use this document as the single source of truth for the MVP API release. It uses
 }
 ```
 
+The response sets `iot_refresh=<opaque-token>; HttpOnly; Secure; SameSite=Lax; Path=/api/auth` and `Cache-Control: no-store`.
+
 For MFA-enabled users return `202` with `data.mfaChallengeId`, `data.expiresInSeconds: 600`, `data.delivery: "email"`, and `meta.code: "MFA_REQUIRED"`.
+
+| Failure case | HTTP status / code | Frontend behaviour |
+| --- | --- | --- |
+| Invalid input | `400` / `VALIDATION_ERROR` | Show field errors. |
+| Invalid credentials | `401` / `INVALID_CREDENTIALS` | Show a generic login error. |
+| Rate limited | `429` / `LOGIN_THROTTLED` | Disable sign-in until the retry time. |
 
 ### 6.3 AUTH-03 - POST /api/auth/mfa/verify
 
@@ -192,6 +213,14 @@ For MFA-enabled users return `202` with `data.mfaChallengeId`, `data.expiresInSe
 | Body | `mfaChallengeId` | string | Yes | Active, unexpired challenge | `mfa_123` |
 | Body | `otp` | string | Yes | Exactly six digits | `123456` |
 | Body | `rememberMe` | boolean | Yes | Value selected at login | `true` |
+
+```json
+{
+  "mfaChallengeId": "mfa_123",
+  "otp": "123456",
+  "rememberMe": true
+}
+```
 
 **Success response: `200 OK`** - same session payload and refresh cookie as login.
 
@@ -212,6 +241,14 @@ For MFA-enabled users return `202` with `data.mfaChallengeId`, `data.expiresInSe
 }
 ```
 
+The response sets `iot_refresh=<opaque-token>; HttpOnly; Secure; SameSite=Lax; Path=/api/auth` and `Cache-Control: no-store`.
+
+| Failure case | HTTP status / code | Frontend behaviour |
+| --- | --- | --- |
+| Invalid OTP | `400` / `OTP_INVALID` | Keep the OTP screen active. |
+| Expired OTP | `400` / `OTP_EXPIRED` | Offer resend. |
+| Too many attempts | `429` / `OTP_ATTEMPTS_EXCEEDED` | Restart login. |
+
 ### 6.4 AUTH-04 - POST /api/auth/mfa/resend
 
 | Field | Value |
@@ -226,6 +263,12 @@ For MFA-enabled users return `202` with `data.mfaChallengeId`, `data.expiresInSe
 | Location | Name | Type | Required | Rules | Example |
 | --- | --- | --- | --- | --- | --- |
 | Body | `mfaChallengeId` | string | Yes | Existing challenge | `mfa_123` |
+
+```json
+{
+  "mfaChallengeId": "mfa_123"
+}
+```
 
 **Success response: `202 Accepted`**
 
@@ -243,6 +286,12 @@ For MFA-enabled users return `202` with `data.mfaChallengeId`, `data.expiresInSe
 }
 ```
 
+| Failure case | HTTP status / code | Frontend behaviour |
+| --- | --- | --- |
+| Invalid or expired challenge | `400` / `OTP_EXPIRED` | Restart login. |
+| Resend throttled | `429` / `OTP_RESEND_THROTTLED` | Disable resend for `retryAfterSeconds`. |
+| Email unavailable | `503` / `SERVICE_UNAVAILABLE` | Show retry state. |
+
 ### 6.5 AUTH-05 - POST /api/auth/refresh
 
 | Field | Value |
@@ -257,6 +306,11 @@ For MFA-enabled users return `202` with `data.mfaChallengeId`, `data.expiresInSe
 | Location | Name | Type | Required | Rules | Example |
 | --- | --- | --- | --- | --- | --- |
 | Cookie | `iot_refresh` | opaque string | Yes | Sent with `credentials: 'include'`; JavaScript cannot read it. | `<redacted>` |
+
+```http
+POST /api/auth/refresh
+Cookie: iot_refresh=<redacted>
+```
 
 **Success response: `200 OK`** - rotate `iot_refresh`.
 
@@ -277,6 +331,13 @@ For MFA-enabled users return `202` with `data.mfaChallengeId`, `data.expiresInSe
 }
 ```
 
+The response rotates the cookie with `Set-Cookie: iot_refresh=<rotated-token>; HttpOnly; Secure; SameSite=Lax; Path=/api/auth` and sends `Cache-Control: no-store`.
+
+| Failure case | HTTP status / code | Frontend behaviour |
+| --- | --- | --- |
+| Cookie absent, revoked, expired, or replayed | `401` / `SESSION_EXPIRED` | Clear all tabs and redirect to Login. |
+| Service failure | `503` / `SERVICE_UNAVAILABLE` | Show retry state. |
+
 ### 6.6 AUTH-06 - POST /api/auth/logout
 
 | Field | Value |
@@ -293,9 +354,19 @@ For MFA-enabled users return `202` with `data.mfaChallengeId`, `data.expiresInSe
 | Cookie | `iot_refresh` | opaque string | No | Idempotent when absent or already revoked. | `<redacted>` |
 | Header | `Authorization` | string | No | Optional `Bearer <accessToken>`. | `Bearer <jwt>` |
 
+```http
+POST /api/auth/logout
+Cookie: iot_refresh=<redacted>
+```
+
 **Success response: `204 No Content`** - clear `iot_refresh`; no JSON body.
 
 FE clears memory and broadcasts `{ "type": "LOGOUT" }` via `BroadcastChannel('iot-auth')`, with a storage-event fallback. Every tab clears state and redirects to Login.
+
+| Failure case | HTTP status / code | Frontend behaviour |
+| --- | --- | --- |
+| Existing or absent session | `204` | Clear local state and broadcast logout. |
+| Temporary service failure | `503` / `SERVICE_UNAVAILABLE` | Clear local state anyway and record the failure. |
 
 ### 6.7 AUTH-07 - POST /api/auth/password-reset/request
 
@@ -312,6 +383,12 @@ FE clears memory and broadcasts `{ "type": "LOGOUT" }` via `BroadcastChannel('io
 | --- | --- | --- | --- | --- | --- |
 | Body | `email` | string | Yes | Valid email | `ada@example.com` |
 
+```json
+{
+  "email": "ada@example.com"
+}
+```
+
 **Success response: `202 Accepted`** - same response for known and unknown emails.
 
 ```json
@@ -324,6 +401,12 @@ FE clears memory and broadcasts `{ "type": "LOGOUT" }` via `BroadcastChannel('io
   }
 }
 ```
+
+| Failure case | HTTP status / code | Frontend behaviour |
+| --- | --- | --- |
+| Invalid email format | `400` / `VALIDATION_ERROR` | Show field error. |
+| Request throttled | `429` / `RESET_THROTTLED` | Show retry guidance. |
+| Email unavailable | `503` / `SERVICE_UNAVAILABLE` | Show retry state. |
 
 ### 6.8 AUTH-08 - POST /api/auth/password-reset/confirm
 
@@ -342,7 +425,21 @@ FE clears memory and broadcasts `{ "type": "LOGOUT" }` via `BroadcastChannel('io
 | Body | `password` | string | Yes | Registration password policy | `NewExamplePass1!` |
 | Body | `confirmPassword` | string | Yes | Must equal password | `NewExamplePass1!` |
 
+```json
+{
+  "token": "<opaque-token>",
+  "password": "NewExamplePass1!",
+  "confirmPassword": "NewExamplePass1!"
+}
+```
+
 **Success response: `204 No Content`** - consume token and revoke all sessions; no JSON body.
+
+| Failure case | HTTP status / code | Frontend behaviour |
+| --- | --- | --- |
+| Invalid token | `400` / `RESET_TOKEN_INVALID` | Offer a new reset request. |
+| Expired token | `400` / `RESET_TOKEN_EXPIRED` | Offer a new reset request. |
+| Password validation failure | `400` / `VALIDATION_ERROR` | Show field errors. |
 
 ## 7. Authentication and session flows
 
@@ -356,6 +453,14 @@ FE clears memory and broadcasts `{ "type": "LOGOUT" }` via `BroadcastChannel('io
 | Logout | `POST /api/auth/logout` | Cookie; bearer optional | 204 | Clear state and broadcast. | Local clear still occurs |
 | Reset request | `POST /api/auth/password-reset/request` | email | Generic 202 | Never infer account existence. | Validation/throttle |
 | Reset confirm | `POST /api/auth/password-reset/confirm` | token, password, confirmPassword | 204 | Redirect to Login; revoke sessions. | Invalid/expired token |
+
+### Session rules
+
+- Access tokens expire after 15 minutes.
+- `rememberMe: true` issues a persistent refresh cookie for 30 days.
+- `rememberMe: false` issues a browser-session refresh cookie with a maximum 12-hour server-side lifetime; closing the browser ends the session.
+- Refresh tokens rotate on every refresh and are stored server-side as hashes.
+- Logout revokes the current server session and clears the refresh cookie; password reset revokes every session for that user.
 
 ## 8. Mock, transitional, and deprecated routes
 
