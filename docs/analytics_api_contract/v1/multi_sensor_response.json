@@ -1,0 +1,13 @@
+{
+  "alert": true,
+  "severity": "HIGH",
+  "stream_pair": [
+    "temperature",
+    "humidity"
+  ],
+  "delta_r": 1.7633,
+  "previous_correlation": -0.9163,
+  "current_correlation": 0.847,
+  "previous_window_index": 77,
+  "current_window_index": 78
+}
