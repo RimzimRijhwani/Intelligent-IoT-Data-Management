@@ -1,356 +1,213 @@
-import React, { useMemo, useState } from 'react';
-import { useSensorData } from '../hooks/useSensorData.js';
-import { useFilteredData } from '../hooks/useFilteredData.js';
-import { useStreamNames } from '../hooks/useStreamNames.js';
-import { useTimeRange } from '../hooks/useTimeRange.js';
-import TimeSelector from './TimeSelector.jsx';
-import StreamSelector from './StreamSelector.jsx';
-import IntervalSelector from './IntervalSelector.jsx';
-import StreamStats from './StreamStats.jsx';
-import './Dashboard.css';
-import Chart from './Chart.jsx';
-import MostCorrelatedPair from './MostCorrelatedPair.jsx';
-import ScatterPlot from './ScatterPlot.jsx';
-import { calculateCorrelation } from '../utils/correlationUtils.js';
-import TimeRangePanel from './TimeRangePanel.jsx';
+// components/Dashboard.jsx
 
-const Dashboard = () => {
-  const { data, loading, error } = useSensorData(true);
-  const streamNames = useStreamNames(data);
-  const { timeOptions, minTime, maxTime } = useTimeRange(data);
+import React from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+} from "recharts";
 
-  const [selectedTimeStart, setSelectedTimeStart] = useState('');
-  const [selectedTimeEnd, setSelectedTimeEnd] = useState('');
-  const [selectedStreams, setSelectedStreams] = useState([]);
+const Dashboard = ({
+  datasetId,
+  data,
+  loading,
+  error,
+  isEmpty,
+  isValid,
+}) => {
+  // Loading state
+  if (loading) {
+    return (
+      <div className="dashboard-state" style={{ textAlign: "center", padding: "3rem" }}>
+        <div className="spinner" style={{
+          border: "4px solid #e2e8f0",
+          borderTop: "4px solid #2563eb",
+          borderRadius: "50%",
+          width: "40px",
+          height: "40px",
+          animation: "spin 1s linear infinite",
+          margin: "0 auto 1rem",
+        }} />
+        <p>Loading sensor data for {datasetId}...</p>
+        <style>{`
+          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        `}</style>
+      </div>
+    );
+  }
 
-  const intervals = ['5min', '15min', '1h', '6h'];
-  const [selectedInterval, setSelectedInterval] = useState(intervals[0]);
+  // Error state
+  if (error) {
+    return (
+      <div className="dashboard-state" style={{ textAlign: "center", padding: "3rem", color: "#dc2626" }}>
+        <p>⚠️ {error.message || "An unexpected error occurred."}</p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            marginTop: "1rem",
+            padding: "0.5rem 1.5rem",
+            background: "#2563eb",
+            color: "white",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer"
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
-  // Time range panel state
-  const [showTimePanel, setShowTimePanel] = useState(false);
-  const [timeMode, setTimeMode] = useState("absolute"); // "absolute" or "relative"
-  const [relativeRange, setRelativeRange] = useState("5min");
-  const [finalStartTime, setFinalStartTime] = useState(null);
-  const [finalEndTime, setFinalEndTime] = useState(null);
-  // End of time range panel state
+  // Invalid data state
+  if (!isValid) {
+    return (
+      <div className="dashboard-state" style={{ textAlign: "center", padding: "3rem", color: "#dc2626" }}>
+        <p>⚠️ The data format is invalid and cannot be displayed.</p>
+      </div>
+    );
+  }
 
-  // const filteredData = useFilteredData(data, {
-  //   startTime: selectedTimeStart,
-  //   endTime: selectedTimeEnd,
-  //   selectedStreams,
-  //   interval: selectedInterval,
-  // });
+  // Empty data state
+  if (isEmpty || !data || !data.rows || data.rows.length === 0) {
+    return (
+      <div className="dashboard-state" style={{ textAlign: "center", padding: "3rem", color: "#64748b" }}>
+        <p>📭 No sensor records found for this dataset.</p>
+      </div>
+    );
+  }
 
-  const filteredData = useFilteredData(data, {
-    startTime: finalStartTime,
-    endTime: finalEndTime,
-    selectedStreams,
-    interval: selectedInterval
+  // Extract data
+  const { rows, metadata, dataset } = data;
+  const streamIds = metadata.streams.map(s => s.id);
+  const displayName = metadata.display_name || dataset;
+
+  // Prepare chart data
+  const chartData = rows.map((row) => {
+    const entry = {
+      timestamp: new Date(row.created_at).toLocaleString(),
+      entry_id: row.entry_id,
+    };
+    streamIds.forEach((id) => {
+      entry[id] = row[id] !== undefined ? row[id] : null;
+    });
+    return entry;
   });
 
-  const streamCount = selectedStreams.length;
-
-  const correlationSummary = useMemo(() => {
-    if (selectedStreams.length !== 2 || filteredData.length === 0) return null;
-
-    const [streamA, streamB] = selectedStreams;
-
-    const x = filteredData
-      .map((d) => parseFloat(d[streamA]))
-      .filter((v) => !isNaN(v));
-
-    const y = filteredData
-      .map((d) => parseFloat(d[streamB]))
-      .filter((v) => !isNaN(v));
-
-    if (x.length === 0 || y.length === 0 || x.length !== y.length) return null;
-
-    const correlation = calculateCorrelation(x, y);
-
-    if (Number.isNaN(correlation) || !Number.isFinite(correlation)) return null;
-
-    let strengthLabel = 'Weak relationship';
-
-    if (correlation >= 0.7) strengthLabel = 'Strong positive relationship';
-    else if (correlation >= 0.3) strengthLabel = 'Moderate positive relationship';
-    else if (correlation <= -0.7) strengthLabel = 'Strong negative relationship';
-    else if (correlation <= -0.3) strengthLabel = 'Moderate negative relationship';
-
+  // Summary stats from metadata
+  const stats = streamIds.map((id) => {
+    const stat = metadata.statistics[id] || {};
     return {
-      streams: `${streamA} vs ${streamB}`,
-      value: correlation.toFixed(2),
-      label: strengthLabel,
+      name: id,
+      min: stat.min || 0,
+      max: stat.max || 0,
+      avg: stat.average || 0,
+      count: stat.valid_count || 0,
     };
-  }, [selectedStreams, filteredData]);
+  });
 
-  // const handleSubmit = () => {
-  //   console.log('Selected Time Range:', selectedTimeStart, '→', selectedTimeEnd);
-  //   console.log('selectedInterval:', selectedInterval);
-  //   console.log('Filtered Data:', filteredData);
-  // };
-
-  // Time range selection logic:
-  const handleSubmit = React.useCallback(() => {
-    console.log("Dashboard timeMode:", timeMode, "relativeRange:", relativeRange);
-
-    if (timeMode === "absolute") {
-      setFinalStartTime(
-        selectedTimeStart ? new Date(selectedTimeStart).getTime() : null
-      );
-      setFinalEndTime(
-        selectedTimeEnd ? new Date(selectedTimeEnd).getTime() : null
-      );
-    }
-
-    if (timeMode === "relative") {
-      // const now = Date.now();
-      const now = new Date(data[data.length - 1].created_at).getTime();
-
-
-      const ranges = {
-        "5min": 5 * 60 * 1000,
-        "15min": 15 * 60 * 1000,
-        "1h": 60 * 60 * 1000,
-        "6h": 6 * 60 * 1000,
-        "24h": 24 * 60 * 1000
-      };
-
-      const duration = ranges[relativeRange] || 0;
-
-      setFinalEndTime(now);
-      setFinalStartTime(now - duration);
-    }
-
-    setShowTimePanel(false);
-  }, [timeMode, relativeRange, selectedTimeStart, selectedTimeEnd]);
-  // End of time range selection logic
-
-  // Refresh button logic: re-apply the current time range selection
-  const handleRefresh = () => {
-    if (timeMode === "relative") {
-      const now = new Date(data[data.length - 1].created_at).getTime();
-
-      const ranges = {
-        "5min": 5 * 60 * 1000,
-        "15min": 15 * 60 * 1000,
-        "1h": 60 * 60 * 1000,
-        "6h": 6 * 60 * 60 * 1000,
-        "24h": 24 * 60 * 60 * 1000
-      };
-
-      const duration = ranges[relativeRange];
-
-      setFinalEndTime(now);
-      setFinalStartTime(now - duration);
-
-      console.log("Refreshed relative time range");
-      return;
-    }
-
-    // Absolute mode
-    setFinalStartTime(finalStartTime);
-    setFinalEndTime(finalEndTime);
-    console.log("Refreshed absolute time range");
-  };
-  // End of refresh button logic
-
-  // formatTimeRange function to display the selected time range in a user-friendly format
-  const formatTimeRange = (start, end, mode, relativeRange) => {
-    if (mode === "relative") {
-      return `Last ${relativeRange}`;
-    }
-
-    // Absolute mode
-    const startStr = new Date(start).toLocaleString();
-    const endStr = new Date(end).toLocaleString();
-    return `${startStr} → ${endStr}`;
-  };
-
-
-
-  if (loading) return <p>Loading dataset...</p>;
-  if (error) return <p>Error loading data</p>;
+  const colours = ["#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#413ea0", "#d0ed57", "#a4de6c", "#ff6b6b"];
 
   return (
-    <div className="dashboard-page">
-      <section className="dashboard-section info-panel">
-        <h3 className="section-title">Dashboard Notes</h3>
-        <ol className="note-list">
-          <li>Select at least one stream to view the line chart.</li>
-          <li>
-            Select two streams to view their scatter plot, correlation coefficient,
-            and rolling correlation using the selected time window.
-          </li>
-          <li>
-            Select at least three streams to identify the most correlated pair in
-            the selected time range.
-          </li>
-          <li>
-            If no scatter plot is shown, the selected data may not have enough
-            variance.
-          </li>
-          <li>
-            If no rolling correlation line is shown, the selected data may not have
-            enough variance.
-          </li>
-          <li>
-            If no meaningful scatter plot is available for the most correlated pair,
-            one or both streams may lack variance.
-          </li>
-          <li>If no time range is selected, the entire dataset is used.</li>
-        </ol>
-
-        <div className="dataset-summary">
-          <div className="summary-pill">
-            <span>Total Data Points</span>
-            <strong>{data.length}</strong>
+    <div className="dashboard-container" style={{ padding: "0 1rem" }}>
+      {/* Summary Cards */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+        gap: "1rem",
+        marginBottom: "2rem",
+      }}>
+        {stats.map((stat, index) => (
+          <div key={stat.name} style={{
+            background: "white",
+            border: "1px solid #dbe7f5",
+            borderRadius: "14px",
+            padding: "1rem",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
+          }}>
+            <h4 style={{ margin: "0 0 0.5rem", color: "#0f172a" }}>
+              {stat.name.toUpperCase()}
+            </h4>
+            <p style={{ margin: "0.25rem 0", color: "#334155" }}>
+              Min: {stat.min} | Max: {stat.max} | Avg: {stat.avg}
+            </p>
+            <span style={{ color: "#64748b", fontSize: "0.9rem" }}>Count: {stat.count}</span>
           </div>
-          <div className="summary-pill">
-            <span>Selected Range Points</span>
-            <strong>{filteredData.length}</strong>
-          </div>
-        </div>
-      </section>
+        ))}
+      </div>
 
-      <section className="dashboard-section stream-panel">
-        <h3 className="section-title">Available Streams</h3>
-        <p className="stream-list">{streamNames.map((s) => s.name).join(', ')}</p>
-      </section>
-
-      <section className="dashboard-section controls-panel">
-        <h3 className="section-title">Controls</h3>
-
-        <div className="selector-grid">
-          <div className="selector-group">
-
-            <StreamSelector
-              streams={streamNames.map(s => s.name)}
-              selectedStreams={selectedStreams}
-              setSelectedStreams={setSelectedStreams}
-            />
-            {/* end streamdropdown */}
-          </div>
-          <div className="selector-group">
-            <IntervalSelector
-              intervals={intervals}
-              selectedInterval={selectedInterval}
-              setSelectedInterval={setSelectedInterval}
-            />
-
-          </div>
-
-          {/* <div className="selector-card selector-card-wide"> */}
-          {/* <h4 className="subsection-title">Time Range Selection</h4> */}
-
-          <div className="time-controls-wrapper">
-            <div className='time-controls'>
-
-              <button
-                className="time-range-toggle"
-                onClick={() => setShowTimePanel(prev => !prev)}>
-                {/* Select Time Range ▼ */}
-                {finalStartTime && finalEndTime
-                  ? formatTimeRange(finalStartTime, finalEndTime, timeMode, relativeRange)
-                  : "Select Time Range ▼"}
-              </button>
-
-              <button className="refresh-btn" onClick={handleRefresh}>
-                ⟳
-              </button>
-
-            </div>
-          </div>
-          {showTimePanel && (
-            <div className="time-range-overlay">
-              <TimeRangePanel
-                timeOptions={timeOptions}
-                selectedTimeStart={selectedTimeStart}
-                setSelectedTimeStart={setSelectedTimeStart}
-                selectedTimeEnd={selectedTimeEnd}
-                setSelectedTimeEnd={setSelectedTimeEnd}
-                timeMode={timeMode}
-                setTimeMode={setTimeMode}
-                relativeRange={relativeRange}
-                setRelativeRange={setRelativeRange}
-                onAnalyze={handleSubmit}
+      {/* Line Chart */}
+      <div style={{
+        background: "white",
+        border: "1px solid #dbe7f5",
+        borderRadius: "20px",
+        padding: "1.5rem",
+        marginBottom: "2rem"
+      }}>
+        <h3 style={{ margin: "0 0 1rem", color: "#0f172a" }}>
+          Time‑series: {streamIds.join(", ")}
+        </h3>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="timestamp" tick={{ fontSize: 10 }} />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            {streamIds.map((id, index) => (
+              <Line
+                key={id}
+                type="monotone"
+                dataKey={id}
+                stroke={colours[index % colours.length]}
+                dot={false}
               />
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="dashboard-section insights-panel">
-        <h3 className="section-title">Insight Cards</h3>
-
-        {streamCount === 0 && (
-          <div className="empty-state">
-            Please select one or more streams to view summary insights and charts.
-          </div>
-        )}
-
-        {streamCount > 0 && (
-          <div className="stream-stats">
-            {selectedStreams.map((stream) => (
-              <StreamStats key={stream} data={filteredData} stream={stream} />
             ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
 
-            {correlationSummary && (
-              <div className="insight-card correlation-card">
-                <div className="insight-card-header">
-                  <span className="insight-label">Correlation</span>
-                  <h3 className="insight-stream-name">{correlationSummary.streams}</h3>
-                </div>
-
-                <div className="correlation-value">{correlationSummary.value}</div>
-                <p className="correlation-text">{correlationSummary.label}</p>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-
-      <section className="dashboard-section analysis-panel">
-        <h3 className="section-title">Analysis Summary</h3>
-
-        {streamCount === 1 && (
-          <div className="status-message">
-            One stream selected. Add another stream to view correlation analysis.
-          </div>
-        )}
-
-        {streamCount === 2 && (
-          <div className="pair-stream-block">
-            <div className="status-message">
-              Two streams selected. Scatter plot and rolling correlation analysis are
-              now available.
-            </div>
-
-            <ScatterPlot
-              data={filteredData}
-              streams={selectedStreams}
-              title="Scatter Plot of Selected Streams"
-            />
-          </div>
-        )}
-
-        {streamCount > 2 && (
-          <div className="multi-stream-block">
-            <div className="status-message">
-              {streamCount} streams selected. Showing the most correlated pair from
-              the chosen streams.
-            </div>
-
-            <MostCorrelatedPair data={filteredData} streams={selectedStreams} />
-          </div>
-        )}
-      </section>
-
-      <section className="dashboard-section chart-panel">
-        <h3 className="section-title">Chart View</h3>
-        <div className="chart-container">
-          <Chart data={filteredData} selectedStreams={selectedStreams} />
+      {/* Bar Chart - First Stream */}
+      {streamIds.length > 0 && (
+        <div style={{
+          background: "white",
+          border: "1px solid #dbe7f5",
+          borderRadius: "20px",
+          padding: "1.5rem",
+          marginBottom: "2rem"
+        }}>
+          <h3 style={{ margin: "0 0 1rem", color: "#0f172a" }}>
+            Bar Chart – {streamIds[0].toUpperCase()}
+          </h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={chartData.slice(0, 20)}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="timestamp" tick={{ fontSize: 10 }} />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey={streamIds[0]} fill={colours[0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
-      </section>
+      )}
+
+      {/* Footer */}
+      <div style={{
+        textAlign: "center",
+        color: "#64748b",
+        fontSize: "0.9rem",
+        padding: "1rem 0"
+      }}>
+        Dataset: {displayName} | Records: {rows.length}
+      </div>
     </div>
   );
 };
