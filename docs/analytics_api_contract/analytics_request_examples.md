@@ -1,64 +1,75 @@
-## 1. Single-Sensor Request (Models)
+## 1. Time-Series Request (Models)
 
-This example shows how the Backend sends data from one sensor to the Models service for anomaly detection.
+This example shows a sample request prepared by the Analytics Integration service for the Models service for anomaly detection using time-series sensor data.
 
 # Example
 
 ```json
 {
-  "timestamp": "2026-07-31T20:30:00+10:00",
-  "sensor_id": "sensor_01",
-  "value": 28.5,
-  "detector": "ECOD",
+  "timestamp_col": "timestamp",
+  "data": [
+    {
+      "timestamp": "2026-07-31T20:30:00+10:00",
+      "temperature": 28.5,
+      "humidity": 65.2
+    },
+    {
+      "timestamp": "2026-07-31T20:35:00+10:00",
+      "temperature": 29.1,
+      "humidity": 64.8
+    }
+  ],
+  "detector": "IsolationForest",
   "parameters": {
-    "sensitivity": "medium"
+    "contamination": 0.05
   }
 }
-```
 
 # Field Description
 
-Field	    Description
-|---------|-------------|
-timestamp	Shows the time.
-sensor_id	Sensor ID.
-value	    Sensor value.
-detector	Detector used.
-parameters  Optional settings.
+Field          Description
+|--------------|-------------|
+timestamp_col  Shows the timestamp column.
+data           Time-series sensor data.
+detector       Detector used for anomaly detection.
+parameters     Optional detector settings.
 
 ## 2. Multi-Sensor Request (Correlation)
 
-This example shows how the Backend sends data from multiple sensors to the Correlation service.
+This example shows a sample request prepared by the Analytics Integration service for the Correlation service.
 
 # Example
 
 ```json
 {
-  "timestamp": "2026-07-31T20:30:00+10:00",
-  "entity_id": "device_01",
-  "streams": [
+  "data": [
+    {
+      "timestamp": "2026-07-31T20:30:00+10:00",
+      "temperature": 28.5,
+      "humidity": 65.2
+    }
+  ],
+  "timestamp_col": "timestamp",
+  "selected_streams": [
     "temperature",
     "humidity"
   ],
-  "values": {
-    "temperature": 28.5,
-    "humidity": 65.2
-  },
-  "method": "Pearson",
-  "time_window": 10
+  "window_size": 10,
+  "step_size": 5,
+  "method": "Pearson"
 }
 ```
 
 # Field Description
-
- Field        Description 
- |----------|-------------| 
- timestamp    Shows the time. 
- entity_id    Device ID. 
- streams      Sensors to compare. 
- values       Sensor values.
- method       Correlation method. 
- time_window  Number of readings to compare. 
+ 
+ Field                 Description
+|--------------------|-------------|
+timestamp_col         Shows the timestamp column.
+selected_streams       Sensors to compare.
+data                   time-series sensor data.
+window_size            Number of readings in each window.
+step_size              Number of readings between windows
+method                 Correlation method.
 
 ## 3. ThingSpeak-style Request
 
@@ -90,46 +101,49 @@ This example shows data received from a ThingSpeak channel.
 
 # Required Fields
 
-- timestamp
-- sensor_id / entity_id
-- value / values
-- streams
-- detector / method
+- data
+- timestamp_col
+- detector
+- selected_streams
+- window_size
+- step_size
+- method
 
 # Optional Fields
 
 - parameters
-- time_window
 
 # Models Service Fields
 
-- sensor_id
-- value
+- data
+- timestamp_col
 - detector
 - parameters
 
 # Correlation Service Fields
 
-- entity_id
-- streams
-- values
+- data
+- timestamp_col
+- selected_streams
+- window_size
+- step_size
 - method
-- time_window
+
 
 
 ## 5. How the Backend Creates the Request
 
 # Models Request
 
-- The Backend gets data from one sensor.
-- It creates a request with the sensor data.
-- The request is sent to the Models service.
+- The Backend provides the sensor data to the Analytics Integration service.
+- Analytics Integration prepares the request with the sensor data.
+- The request is then sent to the Models service.
 
 # Correlation Request
 
-- The Backend gets data from multiple sensors.
-- It creates one request with all the sensor data.
-- The request is sent to the Correlation service.
+- The Backend provides data from multiple sensors to the Analytics Integration service.
+- Analytics Integration prepares one request with the sensor data.
+- The request is then sent to the Correlation service.
 
 # ThingSpeak Request
 
@@ -139,4 +153,4 @@ This example shows data received from a ThingSpeak channel.
 
 ## 6. Request Structure
 
-The request examples use a simple JSON format. This makes it easier for the Backend, Models, and Correlation services to share data. The same structure can also be used for future integration. 
+ The request examples use a simple JSON format. This makes it easier for the Backend, Models, and Correlation services to share data. The same structure can also be used for future integration.
