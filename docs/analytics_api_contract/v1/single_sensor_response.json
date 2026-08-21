@@ -1,7 +1,0 @@
-{
-  "model_name": "ECODDetector",
-  "timestamp": "2026-07-31T20:30:00+10:00",
-  "anomaly_flag": true,
-  "score": 0.82,
-  "runtime": 0.015
-}
