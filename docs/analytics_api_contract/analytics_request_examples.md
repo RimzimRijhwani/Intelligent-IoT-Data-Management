@@ -131,7 +131,7 @@ This example shows data received from a ThingSpeak channel.
 
 
 
-## 5. How the Backend Creates the Request
+## 5. How the Request is Prepared
 
 # Models Request
 
