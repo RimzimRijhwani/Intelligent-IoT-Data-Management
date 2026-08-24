@@ -1,7 +1,7 @@
 # Analytics API Contract Fixtures
 
-These examples are stored under `v1` as the **fixture-set version**.
+I have kept these example files inside the `v1` folder as the fixture-set version.
 
-The `v1` folder name refers only to the version of this fixture set. It does **not** mean that the shared Analytics contract has reached Version 1.0.
+Here, `v1` only refers to the version of the fixture examples. It does not mean that the Analytics contract is Version 1.0.
 
-The shared Analytics response examples currently follow **Draft V0.1** of the Analytics Alert Contract.
+The response examples are based on the current Draft V0.1 Analytics Alert Contract.
