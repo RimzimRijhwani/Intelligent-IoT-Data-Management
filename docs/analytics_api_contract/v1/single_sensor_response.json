@@ -11,7 +11,7 @@
           "temperature"
         ]
       },
-      "method": "IsolationForest",
+      "method": "ECOD",
       "score": 0.1825,
       "score_metadata": {
         "type": "raw_anomaly_score",

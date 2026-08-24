@@ -9,7 +9,7 @@
         "entity_id": null,
         "metrics": [
           "temperature",
-          "pressure"
+          "humidity"
         ]
       },
       "method": "Rolling_Pearson_Correlation",
@@ -19,7 +19,7 @@
         "normalized": false
       },
       "severity": "HIGH",
-      "message": "Correlation between temperature and pressure changed by 0.79.",
+      "message": "Correlation between temperature and humidity changed by 0.79.",
       "time_window": {
         "start": "2026-08-05T08:20:00Z",
         "end": "2026-08-05T08:25:00Z",
