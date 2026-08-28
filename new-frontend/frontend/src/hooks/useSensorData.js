@@ -53,7 +53,8 @@ export const useSensorData = (datasetId, useMock = true, baseUrl = '/api') => {
           setIsValid(false);
           setData(null);
         } else if (!validation.valid) {
-          setError(new Error(`Invalid data: ${validation.reason}`));
+          // Do NOT set a generic error for invalid structure
+          setError(null);
           setIsValid(false);
           setData(null);
         } else if (validation.isEmpty) {

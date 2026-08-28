@@ -5,7 +5,8 @@ import {
   sensor2Response,
   sensor3Response,
   emptyResponse,
-  invalidDataResponse,
+  validationErrorResponse,
+  malformedSensorDataResponse,
   errorResponse,
   insufficientDataResponse,
 } from '../data';
@@ -25,14 +26,16 @@ export const getSensorData = async (datasetId, options = {}) => {
         return sensor3Response;
       case 'empty':
         return emptyResponse;
-      case 'invalid':
-        return invalidDataResponse;
+      case 'validation-error':
+        return validationErrorResponse;
+      case 'malformed':
+        return malformedSensorDataResponse;
       case 'error':
         return errorResponse;
       case 'insufficient':
         return insufficientDataResponse;
       default:
-        return emptyResponse;
+        throw new Error(`Unknown dataset ID: ${datasetId}`);
     }
   }
 

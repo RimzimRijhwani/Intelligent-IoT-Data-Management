@@ -2,12 +2,10 @@
 
 import { useParams } from "react-router-dom";
 import Dashboard from "../components/Dashboard";
-import { useSensorData } from "../hooks/useSensorData";
 import "./DashboardPage.css";
 
 const DashboardPage = () => {
   const { id } = useParams();
-  const { data, loading, error, isEmpty, isValid } = useSensorData(id, true);
 
   return (
     <main className="dashboard-page-shell">
@@ -20,14 +18,7 @@ const DashboardPage = () => {
         </p>
       </section>
 
-      <Dashboard
-        datasetId={id}
-        data={data}
-        loading={loading}
-        error={error}
-        isEmpty={isEmpty}
-        isValid={isValid}
-      />
+      <Dashboard datasetId={id} />
     </main>
   );
 };
