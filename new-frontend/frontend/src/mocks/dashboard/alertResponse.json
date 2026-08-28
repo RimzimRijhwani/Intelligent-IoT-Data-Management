@@ -3,7 +3,7 @@
   "code": 200,
   "message": "Alerts retrieved successfully",
   "metadata": {
-    "contract_version": "Draft V0.1 (PR #3, subject to change after cross-team review)",
+    "contract_version": "Draft V0.1",
     "total_alerts": 1
   },
   "alerts": [
