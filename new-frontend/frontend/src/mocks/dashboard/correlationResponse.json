@@ -3,7 +3,7 @@
   "code": 200,
   "message": "Correlation computed successfully",
   "metadata": {
-    "contract_version": "Draft V0.1 (PR #3, subject to change after cross-team review)"
+    "contract_version": "Draft V0.1"
   },
   "correlation": {
     "stream_a": "Stream Alpha",
