@@ -156,3 +156,31 @@ def test_invalid_severity():
     errors = validate_response(response)
 
     assert len(errors) > 0
+
+def test_correlation_change_alert():
+    response = valid_response()
+
+    alert = valid_alert()
+    alert["alert_type"] = "CORRELATION_CHANGE"
+    alert["source"] = {
+        "component": "correlation"
+    }
+
+    response["alerts"] = [alert]
+
+    errors = validate_response(response)
+
+    assert errors == []
+
+
+def test_null_severity_allowed():
+    response = valid_response()
+
+    alert = valid_alert()
+    alert["severity"] = None
+
+    response["alerts"] = [alert]
+
+    errors = validate_response(response)
+
+    assert errors == []
