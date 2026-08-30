@@ -13,6 +13,7 @@ import MostCorrelatedPair from './MostCorrelatedPair.jsx';
 import ScatterPlot from './ScatterPlot.jsx';
 import { calculateCorrelation } from '../utils/correlationUtils.js';
 import TimeRangePanel from './TimeRangePanel.jsx';
+import ActiveAlerts from "./ActiveAlerts.jsx";
 
 const Dashboard = () => {
   const { data, loading, error } = useSensorData(true);
@@ -308,6 +309,9 @@ const Dashboard = () => {
           </div>
         )}
       </section>
+
+      {/* Block 23 - Active Alerts Dashboard Integration*/}
+      <ActiveAlerts/>
 
       <section className="dashboard-section analysis-panel">
         <h3 className="section-title">Analysis Summary</h3>
