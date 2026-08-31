@@ -15,7 +15,7 @@ import TimeRangePanel from './TimeRangePanel.jsx';
 
 const Dashboard = ({ datasetId }) => {
   // --- ALL HOOKS FIRST ---
-  const { data: sensorData, loading, error, isEmpty, isValid } = useSensorData(datasetId, true);
+  const { data: sensorData, loading, error, isEmpty, isValid } = useSensorData(datasetId);
 
   const data = useMemo(() => {
     if (!sensorData || !sensorData.rows) return [];
