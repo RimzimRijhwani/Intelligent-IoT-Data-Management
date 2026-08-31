@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./Login.css";
+import { validateEmail, validateLoginPassword } from "../utils/validation";
 
 function Login() {
   const navigate = useNavigate();
@@ -14,20 +15,61 @@ function Login() {
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("");
 
+  const [fieldErrors, setFieldErrors] = useState({ email: "", password: "" });
+  const [touched, setTouched] = useState({ email: false, password: false });
+
   const inputRefs = useRef([]);
+
+  const handleFieldChange = (name, value) => {
+    if (name === "email") setEmail(value);
+    if (name === "password") setPassword(value);
+
+    if (touched[name]) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        [name]: name === "email" ? validateEmail(value) : validateLoginPassword(value),
+      }));
+    }
+  };
+
+  const handleBlur = (name, value) => {
+    setTouched((prev) => ({ ...prev, [name]: true }));
+    setFieldErrors((prev) => ({
+      ...prev,
+      [name]: name === "email" ? validateEmail(value) : validateLoginPassword(value),
+    }));
+  };
 
   const handleLoginSubmit = (e) => {
     e.preventDefault();
 
-    const savedUser = JSON.parse(localStorage.getItem("registeredUser"));
+    const emailError = validateEmail(email);
+    const passwordError = validateLoginPassword(password);
 
-    if (!savedUser) {
+    setFieldErrors({ email: emailError, password: passwordError });
+    setTouched({ email: true, password: true });
+
+    if (emailError || passwordError) {
+      setMessage("Please fix the highlighted fields before continuing.");
+      setMessageType("error");
+      return;
+    }
+
+    const registeredUsers = JSON.parse(localStorage.getItem("registeredUsers")) || [];
+    const legacyUser = JSON.parse(localStorage.getItem("registeredUser"));
+    const allUsers = legacyUser ? [...registeredUsers, legacyUser] : registeredUsers;
+
+    if (allUsers.length === 0) {
       setMessage("No registered account found. Please sign up first.");
       setMessageType("error");
       return;
     }
 
-    if (savedUser.email !== email || savedUser.password !== password) {
+    const matchedUser = allUsers.find(
+      (user) => user.email.toLowerCase() === email.trim().toLowerCase() && user.password === password
+    );
+
+    if (!matchedUser) {
       setMessage("Invalid email or password.");
       setMessageType("error");
       return;
@@ -109,28 +151,35 @@ function Login() {
               </p>
             )}
 
-            <form className="login-form" onSubmit={handleLoginSubmit}>
+            <form className="login-form" onSubmit={handleLoginSubmit} noValidate>
               <div className="form-group">
-                <label>Email Address</label>
+                <label htmlFor="login-email">Email Address</label>
                 <input
+                  id="login-email"
                   type="email"
                   placeholder="Enter your email address"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
+                  onChange={(e) => handleFieldChange("email", e.target.value)}
+                  onBlur={(e) => handleBlur("email", e.target.value)}
+                  className={touched.email && fieldErrors.email ? "input-error" : ""}
                 />
+                {touched.email && fieldErrors.email && (
+                  <p className="field-error">{fieldErrors.email}</p>
+                )}
               </div>
 
               <div className="form-group">
-                <label>Password</label>
+                <label htmlFor="login-password">Password</label>
 
                 <div className="password-wrapper">
                   <input
+                    id="login-password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
+                    onChange={(e) => handleFieldChange("password", e.target.value)}
+                    onBlur={(e) => handleBlur("password", e.target.value)}
+                    className={touched.password && fieldErrors.password ? "input-error" : ""}
                   />
 
                   <button
@@ -141,6 +190,9 @@ function Login() {
                     {showPassword ? "Hide" : "Show"}
                   </button>
                 </div>
+                {touched.password && fieldErrors.password && (
+                  <p className="field-error">{fieldErrors.password}</p>
+                )}
               </div>
 
               <div className="login-options">
