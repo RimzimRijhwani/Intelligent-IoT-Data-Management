@@ -1,20 +1,9 @@
 // components/TimeRangePanel.jsx
+
 import React from "react";
 import TimeSelector from "./TimeSelector";
 import "./TimeRangePanel.css";
 
-
-/**
- * TimeRangePanel
- * --------------
- * Grafana-style time range panel.
- * - Left: Absolute time range (Start / End) using existing TimeSelector
- * - Right: Relative time range (dropdown)
- * - Bottom: Analyze button + Change time settings link
- *
- * This component is PRESENTATION ONLY.
- * All state (selected times, mode, etc.) will live in Dashboard and be passed as props.
- */
 const TimeRangePanel = ({
   timeOptions,
   selectedTimeStart,
@@ -27,36 +16,55 @@ const TimeRangePanel = ({
   setRelativeRange,
   onAnalyze,
 }) => {
-
- console.log("TimeMode:", timeMode, "RelativeRange:", relativeRange);
-
   return (
     <div className="time-range-panel">
-      {/* Header / Mode toggle */}
-      <div className="time-range-header">
-        <span className="time-range-title">Select Time Range</span>
 
-        <div className="time-mode-toggle">
-          <button
-            className={timeMode === "absolute" ? "active" : ""}
-            onClick={() => setTimeMode("absolute")}
-          >
-            Absolute
-          </button>
-          <button
-            className={timeMode === "relative" ? "active" : ""}
-            onClick={() => setTimeMode("relative")}
-          >
-            Relative
-          </button>
+      {/* Header */}
+      <div className="time-range-header">
+        <div>
+          <h3 className="time-range-title">
+            Select Time Range
+          </h3>
+
+          <p className="time-range-description">
+            Choose how much sensor data you want to display.
+          </p>
         </div>
       </div>
 
-      {/* Two-column layout: Absolute (left) / Relative (right) */}
+      {/* Absolute / Relative buttons */}
+      <div className="time-mode-toggle">
+        <button
+          type="button"
+          className={timeMode === "absolute" ? "active" : ""}
+          onClick={() => setTimeMode("absolute")}
+        >
+          Absolute
+        </button>
+
+        <button
+          type="button"
+          className={timeMode === "relative" ? "active" : ""}
+          onClick={() => setTimeMode("relative")}
+        >
+          Relative
+        </button>
+      </div>
+
+      {/* Time range options */}
       <div className="time-range-grid">
-        {/* Absolute time range (left) */}
-        <div className={`absolute-section ${timeMode !== "absolute" ? "disabled" : ""}`}>
+
+        {/* Absolute time */}
+        <div
+          className={`time-range-section ${
+            timeMode !== "absolute" ? "disabled" : ""
+          }`}
+        >
           <h4>Absolute time range</h4>
+
+          <p className="section-description">
+            Select a specific start and end time.
+          </p>
 
           <TimeSelector
             label="Start"
@@ -75,11 +83,28 @@ const TimeRangePanel = ({
           />
         </div>
 
-        {/* Relative time range (right) */}
-        <div className={`relative-section ${timeMode !== "relative" ? "disabled" : ""}`}>
+        {/* Relative time */}
+        <div
+          className={`time-range-section ${
+            timeMode !== "relative" ? "disabled" : ""
+          }`}
+        >
           <h4>Relative time range</h4>
 
+          <p className="section-description">
+            Display data from a recent time period.
+          </p>
+
+          <label
+            className="relative-range-label"
+            htmlFor="relative-time-range"
+          >
+            Time period
+          </label>
+
           <select
+            id="relative-time-range"
+            className="relative-range-select"
             value={relativeRange}
             onChange={(e) => setRelativeRange(e.target.value)}
             disabled={timeMode !== "relative"}
@@ -93,16 +118,17 @@ const TimeRangePanel = ({
         </div>
       </div>
 
-      {/* Footer: Analyze + Change settings */}
+      {/* Apply button */}
       <div className="time-range-footer">
-        <button className="analyze-btn" onClick={onAnalyze}>
-          Analyze time range
-        </button>
-
-        <button className="settings-btn">
-          Time settings
+        <button
+          type="button"
+          className="analyze-btn"
+          onClick={onAnalyze}
+        >
+          Apply Time Range
         </button>
       </div>
+
     </div>
   );
 };
