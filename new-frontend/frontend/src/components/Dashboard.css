@@ -399,6 +399,39 @@
   gap: 1rem;
 }
 
+/* In the two-card desktop layout, keep chart metadata out of the plot flow so
+   both plotting areas begin directly below their matching card headings. */
+@media (min-width: 993px) {
+  .correlation-content {
+    display: block;
+    position: relative;
+  }
+
+  .correlation-summary,
+  .scatter-title {
+    position: absolute;
+    top: -0.4rem;
+    z-index: 1;
+  }
+
+  .correlation-summary {
+    right: 0;
+  }
+
+  .scatter-title {
+    left: 0;
+  }
+
+  .scatter-card {
+    display: block;
+  }
+
+  .correlation-content .scatter-chart {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
+
 @media (max-width: 992px) {
   .chart-analysis-grid {
     grid-template-columns: 1fr;
