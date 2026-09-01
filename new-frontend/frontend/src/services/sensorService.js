@@ -100,6 +100,7 @@ export const getSensorData = async (datasetId, options = {}) => {
   // These fields are metadata,
   // not actual sensor streams
   const excludedFields = new Set([
+    'dataset_id',
     'created_at',
     'entry_id',
   ]);
