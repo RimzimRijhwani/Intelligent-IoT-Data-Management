@@ -347,3 +347,29 @@
   right: 0;
   z-index: 9999;
 }
+/* Container for the chips */
+.streams-container {
+  display: flex;
+  flex-wrap: wrap; 
+  gap: 10px;       /* Space between each chip */
+  margin-top: 10px;
+}
+
+/* The individual chip/card design */
+.stream-chip {
+  display: inline-flex;
+  align-items: center;
+  background-color: #f1f5f9; /* Light gray background */
+  border: 1px solid #cbd5e1; /* Subtle border */
+  border-radius: 20px;       /* Makes it pill-shaped */
+  padding: 6px 14px;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+/* Styling for the unit (e.g., °C, %) */
+.stream-unit {
+  margin-left: 5px;
+  color: #64748b;
+  font-size: 0.8rem;
+}

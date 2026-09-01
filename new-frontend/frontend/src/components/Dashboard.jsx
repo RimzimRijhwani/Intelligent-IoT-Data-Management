@@ -211,10 +211,16 @@ const Dashboard = () => {
           </div>
         </div>
       </section>
-
       <section className="dashboard-section stream-panel">
-        <h3 className="section-title">Available Streams</h3>
-        <p className="stream-list">{streamNames.map((s) => s.name).join(', ')}</p>
+  <h3 className="section-title">Available Streams</h3>
+  <div className="streams-container">
+    {streamNames.map((stream, index) => (
+      <div key={index} className="stream-chip">
+        <span className="stream-name">Field {index + 1}</span>
+        {stream.unit && <span className="stream-unit">({stream.unit})</span>}
+      </div>
+    ))}
+  </div>
       </section>
 
       <section className="dashboard-section controls-panel">
