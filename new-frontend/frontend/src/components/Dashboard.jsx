@@ -340,7 +340,12 @@ const Dashboard = ({ datasetId }) => {
       </section>
 
       {/* Block 23 - Active Alerts Dashboard Integration*/}
-      <ActiveAlerts/>
+      <ActiveAlerts
+        alerts={[]}
+        loading={false}
+        error={null}
+        hasAnalysed={false}  
+      />
 
       <section className="dashboard-section analysis-panel">
         <h3 className="section-title">Analysis Summary</h3>

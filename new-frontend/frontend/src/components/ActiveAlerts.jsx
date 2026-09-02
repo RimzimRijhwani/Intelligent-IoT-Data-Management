@@ -1,5 +1,5 @@
 // Block 10 - Active Alerts Imports
-import { useAlerts } from "../hooks/useAlerts";
+
 import "./ActiveAlerts.css";
 
 // Block 11 - Convert Technical Values into Readable Labels
@@ -45,13 +45,27 @@ const formatMethod = (method) => {
 
 // Block 15 - Active Alerts Component and Loading State
 const ActiveAlerts = ({
-    useMock = true,
-    endpoint = "/api/alerts",
+    alerts = [],
+    loading = false,
+    error = null,
+    hasAnalysed = false,
 }) => {
-    const { alerts, loading, error } = useAlerts(
-        useMock,
-        endpoint
-    );
+    if (!hasAnalysed) {
+        return (
+            <section
+                className="active-alerts-panel active-alerts-panel--empty"
+                aria-live="polite"
+            >
+                <h2 className="active-alerts-title">
+                    Active Alerts
+                </h2>
+
+                <p className="active-alerts-status">
+                    Run an analysis to view active alerts.
+                </p>
+            </section>
+        );
+    }
 
     if (loading) {
         return (
