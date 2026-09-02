@@ -11,6 +11,7 @@ import Chart from './Chart.jsx';
 import CorrelationAnalysis from './CorrelationAnalysis.jsx';
 import { calculateCorrelation } from '../utils/correlationUtils.js';
 import TimeRangePanel from './TimeRangePanel.jsx';
+import ActiveAlerts from "./ActiveAlerts.jsx";
 
 const Dashboard = ({ datasetId }) => {
   // --- ALL HOOKS FIRST ---
@@ -336,6 +337,14 @@ const Dashboard = ({ datasetId }) => {
           </div>
         )}
       </section>
+
+      {/* Block 23 - Active Alerts Dashboard Integration*/}
+      <ActiveAlerts
+        alerts={[]}
+        loading={false}
+        error={null}
+        hasAnalysed={false}  
+      />
 
       <div className="chart-analysis-grid">
         <section className="dashboard-section chart-analysis-card">
