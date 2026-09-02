@@ -8,14 +8,14 @@ import IntervalSelector from './IntervalSelector.jsx';
 import StreamStats from './StreamStats.jsx';
 import './Dashboard.css';
 import Chart from './Chart.jsx';
-import MostCorrelatedPair from './MostCorrelatedPair.jsx';
-import ScatterPlot from './ScatterPlot.jsx';
+import CorrelationAnalysis from './CorrelationAnalysis.jsx';
 import { calculateCorrelation } from '../utils/correlationUtils.js';
 import TimeRangePanel from './TimeRangePanel.jsx';
+import ActiveAlerts from "./ActiveAlerts.jsx";
 
 const Dashboard = ({ datasetId }) => {
   // --- ALL HOOKS FIRST ---
-  const { data: sensorData, loading, error, isEmpty, isValid } = useSensorData(datasetId, true);
+  const { data: sensorData, loading, error, isEmpty, isValid } = useSensorData(datasetId);
 
   const data = useMemo(() => {
     if (!sensorData || !sensorData.rows) return [];
@@ -338,48 +338,27 @@ const Dashboard = ({ datasetId }) => {
         )}
       </section>
 
-      <section className="dashboard-section analysis-panel">
-        <h3 className="section-title">Analysis Summary</h3>
+      {/* Block 23 - Active Alerts Dashboard Integration*/}
+      <ActiveAlerts
+        alerts={[]}
+        loading={false}
+        error={null}
+        hasAnalysed={false}  
+      />
 
-        {streamCount === 1 && (
-          <div className="status-message">
-            One stream selected. Add another stream to view correlation analysis.
-          </div>
-        )}
-
-        {streamCount === 2 && (
-          <div className="pair-stream-block">
-            <div className="status-message">
-              Two streams selected. Scatter plot and rolling correlation analysis are
-              now available.
-            </div>
-
-            <ScatterPlot
-              data={filteredData}
-              streams={selectedStreams}
-              title="Scatter Plot of Selected Streams"
-            />
-          </div>
-        )}
-
-        {streamCount > 2 && (
-          <div className="multi-stream-block">
-            <div className="status-message">
-              {streamCount} streams selected. Showing the most correlated pair from
-              the chosen streams.
-            </div>
-
-            <MostCorrelatedPair data={filteredData} streams={selectedStreams} />
-          </div>
-        )}
-      </section>
-
-      <section className="dashboard-section chart-panel">
-        <h3 className="section-title">Chart View</h3>
-        <div className="chart-container">
+      <div className="chart-analysis-grid">
+        <section className="dashboard-section chart-analysis-card">
+          <h3 className="section-title chart-section-title">
+            Sensor Trends <span>(Selected Streams)</span>
+          </h3>
           <Chart data={filteredData} selectedStreams={selectedStreams} />
-        </div>
-      </section>
+        </section>
+
+        <section className="dashboard-section chart-analysis-card correlation-analysis-card">
+          <h3 className="section-title chart-section-title">Correlation Analysis</h3>
+          <CorrelationAnalysis data={filteredData} selectedStreams={selectedStreams} />
+        </section>
+      </div>
     </div>
   );
 };

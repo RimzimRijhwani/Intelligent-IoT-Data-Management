@@ -1,26 +1,47 @@
 {
   "status": "success",
-  "code": 200,
-  "message": "Alerts retrieved successfully",
-  "metadata": {
-    "contract_version": "Draft V0.1",
-    "total_alerts": 1
-  },
+  "generated_at": "2026-08-29T05:20:31Z",
+
   "alerts": [
     {
-      "timestamp": "2026-08-07T09:10:00Z",
-      "alert_type": "correlation_shift",
-      "target_streams": ["Stream Alpha", "Sensor 2"],
-      "method": "pearson",
-      "message": "Correlation between Stream Alpha and Sensor 2 rose sharply within the last hour",
-      "source": "analytics-service",
-      "score": 0.81,
-      "severity": "moderate",
-      "time_window": "2026-08-07T08:00:00Z/2026-08-07T09:10:00Z",
+      "alert_id": "alert-001",
+      "timestamp": "2026-08-29T05:18:00Z",
+      "alert_type": "POINTWISE_ANOMALY",
+      "target": "temperature",
+      "method": "isolationforest",
+      "message": "Unusual temperature reading detected.",
+      "source": "models",
+      "score": -0.82,
+      "severity": "high",
       "supporting_values": {
-        "previous_correlation": 0.62,
-        "current_correlation": 0.81
+        "temperature": 47.3
+      }
+    },
+
+    {
+      "alert_id": "alert-002",
+      "timestamp": "2026-08-29T05:19:00Z",
+      "alert_type": "CORRELATION_CHANGE",
+      "target": [
+        "temperature",
+        "humidity"
+      ],
+      "method": "pearson",
+      "message": "Significant correlation change detected.",
+      "source": "correlation",
+      "severity": "medium",
+      "score": 0.34,
+      "time_window": {
+        "start": "2026-08-29T05:00:00Z",
+        "end": "2026-08-29T05:19:00Z"
       }
     }
-  ]
+  ],
+
+  "summary": {
+    "processed_items": 300,
+    "alert_count": 2
+  },
+
+  "errors": []
 }
