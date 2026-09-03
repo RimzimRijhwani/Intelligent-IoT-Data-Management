@@ -48,6 +48,9 @@ const getAllDatasets = async (req, res) => {
 const getDatasetById = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!/^\d+$/.test(id) || Number(id) < 1) {
+      return res.status(400).json({ error: 'Dataset ID must be a positive integer' });
+    }
     const dataset = await datasetService.getDatasetById(id);
 
     if (!dataset) {

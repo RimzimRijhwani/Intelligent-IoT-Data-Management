@@ -40,6 +40,7 @@ Use this document as the single source of truth for the MVP API release.
 | DATA-01 | `GET` | `/api/datasets` | List datasets with their total persisted row counts | None | FE dataset selector | Implemented |
 | DATA-02 | `POST` | `/api/datasets` | Persist a reviewed CSV dataset, its mappings and mapped time-series rows | Bearer access token | FE upload wizard | Implemented |
 | DATA-03 | `PUT` | `/api/datasets/:id` | Replace mapping metadata and append reviewed CSV rows | Bearer access token | FE dataset editor | Implemented |
+| DATA-04 | `GET` | `/api/datasets/:id` | Retrieve one dataset's metadata and persisted row count | None | FE dataset detail | Implemented |
 
 ## 4. Data and naming rules
 
@@ -458,6 +459,7 @@ The frontend parses the selected file locally for the Upload, Map fields, and Re
 | Body field | Type | Required | Rules |
 | --- | --- | --- | --- |
 | `name` | string | Yes | Trimmed, 1–120 characters; unique dataset name. |
+| `description` | string | No | Trimmed, maximum 1,000 characters. |
 | `timestampField` | string | Yes | Exact CSV header to write to `timeseries.created_at`. It is not a `dataset_field_mappings` row because only sensor columns can use `field1`–`field8`. |
 | `mappings` | array | Yes | 1–8 sensor mappings to `field1`–`field8`. |
 | `mappings[].sourceField` | string | Yes | Exact CSV header in each row. Unique per dataset. |
@@ -469,6 +471,7 @@ The frontend parses the selected file locally for the Upload, Map fields, and Re
 ```json
 {
   "name": "microclimate-sensors-april-2026",
+  "description": "Greenhouse sensor readings collected during April 2026.",
   "timestampField": "Time",
   "mappings": [
     { "sourceField": "AirTemperature", "storageField": "field1", "displayName": "Temperature", "sourceDataType": "number" },
@@ -532,6 +535,7 @@ The request uses the same timestamp, mapping, and row fields as `POST /api/datas
 | Body field | Type | Required | Rules |
 | --- | --- | --- | --- |
 | `timestampField` | string | Yes | CSV header written to `timeseries.created_at`. |
+| `description` | string | No | Replaces the stored description when supplied; maximum 1,000 characters. |
 | `mappings` | array | Yes | Complete selected mapping set; `field1` through `field8` only. |
 | `mappings[].sourceField` | string | Yes | Original CSV column header. |
 | `mappings[].storageField` | string | Yes | `field1` through `field8`; unique per dataset. |
@@ -543,6 +547,7 @@ The request uses the same timestamp, mapping, and row fields as `POST /api/datas
 
 ```json
 {
+  "description": "Greenhouse sensor readings collected during April 2026.",
   "timestampField": "Time",
   "mappings": [
     {
@@ -645,6 +650,46 @@ The request uses the same timestamp, mapping, and row fields as `POST /api/datas
 | Failure case | HTTP status / response | Frontend behaviour |
 | --- | --- | --- |
 | Database failure | `500` / `{ "error": "Failed to load datasets" }` | Preserve the current selection and offer retry. |
+
+### 6.12 DATA-04 - GET /api/datasets/:id
+
+| Field | Value |
+| --- | --- |
+| Purpose | Retrieve metadata for one dataset and the total number of its persisted wide time-series rows. |
+| Authentication | None |
+| Content type | `application/json` |
+
+**Success response: `200 OK`**
+
+```json
+{
+  "id": 42,
+  "name": "microclimate-sensors-april-2026",
+  "description": "",
+  "timestampField": "Time",
+  "totalRows": 18,
+  "mappings": [
+    {
+      "sourceField": "AirTemperature",
+      "storageField": "field1",
+      "sourceDataType": "number",
+      "displayName": "Temperature"
+    }
+  ],
+  "createdBy": "4c7c77b9-2bb8-4a3e-9b7a-4a66782e9dd6",
+  "updatedBy": "4c7c77b9-2bb8-4a3e-9b7a-4a66782e9dd6",
+  "createdAt": "2026-09-04T10:00:00.000Z",
+  "updatedAt": "2026-09-04T10:00:00.000Z"
+}
+```
+
+| Failure case | HTTP status / response |
+| --- | --- |
+| Dataset ID is not a positive integer | `400` / `{ "error": "Dataset ID must be a positive integer" }` |
+| Dataset does not exist | `404` / `{ "error": "Dataset not found" }` |
+| Database failure | `500` / `{ "error": "Failed to load dataset" }` |
+
+`timestampField` is the source CSV header used to write `timeseries.created_at`; it can be `null` for legacy datasets created before this field was saved. `mappings` is always an array. Each item contains the saved `sourceField`, `storageField`, `sourceDataType`, and `displayName`; items are ordered by `storageField`.
 
 ## 7. Authentication and session flows
 

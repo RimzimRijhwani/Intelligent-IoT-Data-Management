@@ -61,18 +61,28 @@ function validateImport(input, { requireName = true } = {}) {
   input = input && typeof input === "object" && !Array.isArray(input) ? input : {};
   const fields = {};
   const name = text(input.name);
+  const descriptionProvided = Object.hasOwn(input, "description");
+  const description = descriptionProvided ? text(input.description) : undefined;
   const timestampField = text(input.timestampField);
   const mappings = input.mappings;
   const rows = Array.isArray(input.rows) ? input.rows : null;
 
   if (requireName && (!name || name.length > 120))
     fields.name = "Enter a dataset name of at most 120 characters.";
+  if (descriptionProvided && (typeof input.description !== "string" || description.length > 1000))
+    fields.description = "Must be a string of at most 1000 characters.";
   if (!timestampField) fields.timestampField = "Select one CSV timestamp column.";
   if (!rows || rows.length < 1)
     fields.rows = "Provide one or more CSV rows.";
 
   if (Object.keys(fields).length) throw validationError(fields);
-  return { name, timestampField, mappings: validateMappings(mappings, timestampField), rows };
+  return {
+    name,
+    description,
+    timestampField,
+    mappings: validateMappings(mappings, timestampField),
+    rows,
+  };
 }
 
 function mapRows(rows, timestampField, mappings) {
