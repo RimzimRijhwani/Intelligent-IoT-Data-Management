@@ -4,12 +4,13 @@ const {
   DatasetImportError,
   importDataset,
   mapRows,
+  updateDataset,
   validateImport,
 } = require("../src/services/datasetImportService");
 
 const mappings = [
-  { sourceField: "AirTemperature", storageField: "field1", displayName: "Temperature" },
-  { sourceField: "RelativeHumidity", storageField: "field2", displayName: "Humidity" },
+  { sourceField: "AirTemperature", storageField: "field1", displayName: "Temperature", sourceDataType: "number" },
+  { sourceField: "RelativeHumidity", storageField: "field2", displayName: "Humidity", sourceDataType: "number" },
 ];
 
 test("reviewed CSV fields are converted to a wide time-series row", () => {
@@ -42,8 +43,8 @@ test("an import rejects duplicate storage fields", () => {
         timestampField: "Time",
         rows: [{ Time: "2026-04-29T01:25:15+10:00", AirTemperature: "16.7" }],
         mappings: [
-          { sourceField: "AirTemperature", storageField: "field1", displayName: "Temperature" },
-          { sourceField: "RelativeHumidity", storageField: "field1", displayName: "Humidity" },
+          { sourceField: "AirTemperature", storageField: "field1", displayName: "Temperature", sourceDataType: "number" },
+          { sourceField: "RelativeHumidity", storageField: "field1", displayName: "Humidity", sourceDataType: "number" },
         ],
       }),
     (error) =>
@@ -94,4 +95,52 @@ test("the authenticated user id and reviewed mappings are passed to the transact
   assert.equal(received.userId, "4c7c77b9-2bb8-4a3e-9b7a-4a66782e9dd6");
   assert.equal(received.mappings[0].displayName, "Temperature");
   assert.equal(received.wideRows[0].field2, 79.9);
+});
+
+test("PUT accepts the same reviewed CSV payload as POST", async () => {
+  let received;
+  const repository = {
+    async replaceMappingsAndAddRows(id, input) {
+      received = { id, ...input };
+      return { id, addedRowCount: input.wideRows.length };
+    },
+  };
+  const user = { sub: "4c7c77b9-2bb8-4a3e-9b7a-4a66782e9dd6", role: "user" };
+  const result = await updateDataset(
+    "42",
+    {
+      timestampField: "Time",
+      mappings: mappings.slice(0, 1),
+      rows: [
+        { Time: "2026-04-29T01:25:15+10:00", AirTemperature: "16.7" },
+      ],
+    },
+    user,
+    repository,
+  );
+  assert.deepEqual(result, { id: 42, addedRowCount: 1 });
+  assert.equal(received.id, 42);
+  assert.equal(received.user, user);
+  assert.equal(received.wideRows[0].entryId, 1);
+  assert.equal(received.wideRows[0].field1, 16.7);
+});
+
+test("PUT rejects dataset renames", async () => {
+  await assert.rejects(
+    () =>
+      updateDataset(
+        "42",
+        {
+          name: "Renamed dataset",
+          timestampField: "Time",
+          mappings: mappings.slice(0, 1),
+          rows: [{ Time: "2026-04-29T01:25:15+10:00", AirTemperature: "16.7" }],
+        },
+        { sub: "user-id", role: "user" },
+        {},
+      ),
+    (error) =>
+      error instanceof DatasetImportError &&
+      error.fields.name === "Dataset name cannot be updated.",
+  );
 });

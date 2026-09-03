@@ -12,6 +12,8 @@
  */
 
 const db = require('../db/pool'); // pg Pool instance
+const repositoryError = (code, status, message) =>
+  Object.assign(new Error(message), { code, status });
 
 class DatasetRepository {
   async findAll() {
@@ -91,9 +93,9 @@ class DatasetRepository {
       for (const mapping of mappings) {
         await client.query(
           `INSERT INTO dataset_field_mappings
-             (dataset_id, source_field, storage_field, display_name, created_by, updated_by)
-           VALUES ($1, $2, $3, $4, $5, $5)`,
-          [dataset.id, mapping.sourceField, mapping.storageField, mapping.displayName, userId],
+             (dataset_id, source_field, storage_field, source_data_type, display_name, created_by, updated_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $6)`,
+          [dataset.id, mapping.sourceField, mapping.storageField, mapping.sourceDataType, mapping.displayName, userId],
         );
       }
 
@@ -118,6 +120,68 @@ class DatasetRepository {
         ...dataset,
         mappings,
         importedRowCount: wideRows.length,
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async replaceMappingsAndAddRows(datasetId, { mappings, wideRows, user }) {
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+      const datasetResult = await client.query(
+        `SELECT id, created_by AS "createdBy"
+         FROM datasets WHERE id = $1 FOR UPDATE`,
+        [datasetId],
+      );
+      const dataset = datasetResult.rows[0];
+      if (!dataset)
+        throw repositoryError("DATASET_NOT_FOUND", 404, "Dataset not found.");
+      if (dataset.createdBy !== user.sub && user.role !== "admin")
+        throw repositoryError("FORBIDDEN", 403, "You cannot update this dataset.");
+
+      await client.query(`DELETE FROM dataset_field_mappings WHERE dataset_id = $1`, [datasetId]);
+      for (const mapping of mappings) {
+        await client.query(
+          `INSERT INTO dataset_field_mappings
+             (dataset_id, source_field, storage_field, source_data_type, display_name, created_by, updated_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $6)`,
+          [datasetId, mapping.sourceField, mapping.storageField, mapping.sourceDataType, mapping.displayName, user.sub],
+        );
+      }
+
+      const maxEntryResult = await client.query(
+        `SELECT COALESCE(MAX(entry_id), 0)::integer AS "maxEntryId"
+         FROM timeseries WHERE dataset_id = $1`,
+        [datasetId],
+      );
+      const maxEntryId = maxEntryResult.rows[0].maxEntryId;
+      for (const [index, row] of wideRows.entries()) {
+        const storageFields = Object.keys(row).filter((key) => key.startsWith("field"));
+        const columns = ["dataset_id", "created_at", "entry_id", ...storageFields];
+        const values = [datasetId, row.createdAt, maxEntryId + index + 1, ...storageFields.map((field) => row[field])];
+        const placeholders = columns.map((_, index) => `$${index + 1}`).join(", ");
+        await client.query(
+          `INSERT INTO timeseries (${columns.join(", ")}) VALUES (${placeholders})`,
+          values,
+        );
+      }
+
+      const updatedResult = await client.query(
+        `UPDATE datasets SET updated_by = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1
+         RETURNING id, updated_by AS "updatedBy", updated_at AS "updatedAt"`,
+        [datasetId, user.sub],
+      );
+      await client.query("COMMIT");
+      return {
+        ...updatedResult.rows[0],
+        updatedMappingCount: mappings.length,
+        addedRowCount: wideRows.length,
       };
     } catch (error) {
       await client.query("ROLLBACK");

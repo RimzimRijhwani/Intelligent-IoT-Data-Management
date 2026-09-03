@@ -5,6 +5,7 @@ const {
   getAllDatasets,
   getDatasetById,
   createDataset,
+  updateDataset,
 } = require('../controllers/datasetsController');
 const authMiddleware = require('../middleware/authMiddleware');
 
@@ -16,5 +17,8 @@ router.get('/datasets/:id', getDatasetById);
 
 // POST /api/datasets
 router.post('/datasets', authMiddleware, createDataset);
+
+// PUT /api/datasets/:id
+router.put('/datasets/:id', authMiddleware, updateDataset);
 
 module.exports = router;

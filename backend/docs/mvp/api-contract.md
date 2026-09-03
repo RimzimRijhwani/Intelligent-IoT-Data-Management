@@ -450,19 +450,18 @@ FE clears memory and broadcasts `{ "type": "LOGOUT" }` via `BroadcastChannel('io
 | Authentication | `Authorization: Bearer <accessToken>`; `created_by` always comes from the JWT `sub`, never from the request body. |
 | Content type | `application/json` |
 | Transaction behaviour | All inserts succeed or the request is rolled back. No partially imported dataset is visible. |
-| Maximum | 100,000 rows, one timestamp column and 1–8 numeric sensor mappings. |
 
 The frontend parses the selected file locally for the Upload, Map fields, and Review steps. On **Import**, it posts the parsed values for selected columns together with the user-confirmed `mappings`. Unselected CSV columns are not persisted. This avoids re-uploading a file that the user has already reviewed and makes the final request deterministic.
 
 | Body field | Type | Required | Rules |
-| --- | --- | --- |
+| --- | --- | --- | --- |
 | `name` | string | Yes | Trimmed, 1–120 characters; unique dataset name. |
 | `timestampField` | string | Yes | Exact CSV header to write to `timeseries.created_at`. It is not a `dataset_field_mappings` row because only sensor columns can use `field1`–`field8`. |
 | `mappings` | array | Yes | 1–8 sensor mappings to `field1`–`field8`. |
 | `mappings[].sourceField` | string | Yes | Exact CSV header in each row. Unique per dataset. |
 | `mappings[].storageField` | string | Yes | `field1` through `field8`; unique per dataset. |
 | `mappings[].displayName` | string | Yes | User-facing field label, maximum 120 characters. |
-| `mappings[].sourceDataType` | string | Yes | Detected CSV type: `number`, `text`, `datetime`, or `boolean`. Current `field1`–`field8` mappings must use `number`, because their PostgreSQL destination is `DOUBLE PRECISION`. |
+| `mappings[].sourceDataType` | string | Yes | `number`. It records the detected source type; `field1`–`field8` require numeric values because their PostgreSQL destination is `DOUBLE PRECISION`. |
 | `rows` | object[] | Yes | Parsed CSV rows keyed by source header. Selected timestamp values must be parseable dates; selected sensor values must be finite numbers or empty (stored as `NULL`). |
 
 ```json
@@ -515,6 +514,87 @@ The frontend parses the selected file locally for the Upload, Map fields, and Re
 | No/invalid/expired access token | `401` / `UNAUTHENTICATED` or `ACCESS_TOKEN_EXPIRED` | Refresh once, then return to sign-in if needed. |
 | Dataset name already exists | `409` / `DATASET_NAME_EXISTS` | Ask for a different dataset name; preserve the reviewed data. |
 | Database failure | `500` / `INTERNAL_ERROR` | Leave the user on review; retry is safe because the database transaction was rolled back. |
+
+### 6.10 DATA-02 - PUT /api/datasets/:id
+
+| Field | Value |
+| --- | --- |
+| Purpose | Update an existing dataset’s selected field mappings and append reviewed CSV rows. The dataset name cannot be changed. |
+| Authentication | `Authorization: Bearer <accessToken>` |
+| Content type | `application/json` |
+| Transaction behaviour | Mapping changes, audit metadata, and new-row inserts succeed together or are rolled back together. |
+| Row behaviour | Existing time-series rows are never overwritten. The server assigns new `entryId` values after the current highest entry for the dataset. |
+
+The request uses the same timestamp, mapping, and row fields as `POST /api/datasets`, but omits `name`.
+
+| Body field | Type | Required | Rules |
+| --- | --- | --- | --- |
+| `timestampField` | string | Yes | CSV header written to `timeseries.created_at`. |
+| `mappings` | array | Yes | Complete selected mapping set; `field1` through `field8` only. |
+| `mappings[].sourceField` | string | Yes | Original CSV column header. |
+| `mappings[].storageField` | string | Yes | `field1` through `field8`; unique per dataset. |
+| `mappings[].displayName` | string | Yes | Frontend label, maximum 120 characters. |
+| `mappings[].sourceDataType` | string | Yes | Must be `number`. |
+| `rows` | object[] | Yes | New parsed CSV rows keyed by source header. |
+
+**Example request body**
+
+```json
+{
+  "timestampField": "Time",
+  "mappings": [
+    {
+      "sourceField": "AirTemperature",
+      "storageField": "field1",
+      "displayName": "Temperature",
+      "sourceDataType": "number"
+    },
+    {
+      "sourceField": "RelativeHumidity",
+      "storageField": "field2",
+      "displayName": "Humidity",
+      "sourceDataType": "number"
+    },
+    {
+      "sourceField": "AtmosphericPressure",
+      "storageField": "field3",
+      "displayName": "Pressure",
+      "sourceDataType": "number"
+    }
+  ],
+  "rows": [
+    {
+      "Time": "2026-04-29T01:25:15+10:00",
+      "AirTemperature": "16.7",
+      "RelativeHumidity": "79.9",
+      "AtmosphericPressure": "1026.1"
+    },
+    {
+      "Time": "2026-04-29T01:30:15+10:00",
+      "AirTemperature": "16.9",
+      "RelativeHumidity": "78.4",
+      "AtmosphericPressure": "1025.8"
+    }
+  ]
+}
+```
+
+**Success: `200 OK`**
+
+```json
+{
+  "data": {
+    "id": 42,
+    "updatedMappingCount": 2,
+    "addedRowCount": 18,
+    "updatedBy": "user-uuid",
+    "updatedAt": "2026-09-04T10:00:00.000Z"
+  },
+  "meta": {
+    "requestId": "req_02"
+  }
+}
+```
 
 ## 7. Authentication and session flows
 

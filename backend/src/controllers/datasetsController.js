@@ -74,8 +74,22 @@ const createDataset = async (req, res) => {
   }
 };
 
+/**
+ * PUT /api/datasets/:id
+ * Replaces dataset mapping metadata and/or appends canonical wide rows.
+ */
+const updateDataset = async (req, res) => {
+  try {
+    const dataset = await datasetService.updateDataset(req.params.id, req.body, req.user);
+    return res.status(200).json({ data: dataset, meta: { requestId: requestId(req) } });
+  } catch (err) {
+    return datasetError(res, req, err);
+  }
+};
+
 module.exports = {
   getAllDatasets,
   getDatasetById,
   createDataset,
+  updateDataset,
 };
