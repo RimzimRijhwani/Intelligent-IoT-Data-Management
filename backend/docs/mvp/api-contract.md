@@ -6,7 +6,7 @@ Use this document as the single source of truth for the MVP API release.
 
 | Field | Value |
 | --- | --- |
-| Contract version | `v1.0.0` |
+| Contract version | `v1.1.0` |
 | Status | Approved contract baseline - BE implementation pending |
 | API base URL | Local: `http://localhost:3000/api`; deployed: `VITE_API_BASE_URL` ending in `/api` over HTTPS |
 | Related tickets | `AFI-14`, `AFI-16` |
@@ -37,6 +37,7 @@ Use this document as the single source of truth for the MVP API release.
 | AUTH-06 | `POST` | `/api/auth/logout` | Revoke current session | Refresh cookie | FE | BE pending |
 | AUTH-07 | `POST` | `/api/auth/password-reset/request` | Request reset instructions | None | FE | BE pending |
 | AUTH-08 | `POST` | `/api/auth/password-reset/confirm` | Confirm password reset | None | FE | BE pending |
+| DATA-01 | `POST` | `/api/datasets` | Persist a reviewed CSV dataset, its mappings and mapped time-series rows | Bearer access token | FE upload wizard | Implemented |
 
 ## 4. Data and naming rules
 
@@ -440,6 +441,80 @@ FE clears memory and broadcasts `{ "type": "LOGOUT" }` via `BroadcastChannel('io
 | Invalid token | `400` / `RESET_TOKEN_INVALID` | Offer a new reset request. |
 | Expired token | `400` / `RESET_TOKEN_EXPIRED` | Offer a new reset request. |
 | Password validation failure | `400` / `VALIDATION_ERROR` | Show field errors. |
+
+### 6.9 DATA-01 - POST /api/datasets
+
+| Field | Value |
+| --- | --- |
+| Purpose | Commit the upload wizard's reviewed CSV data. The server creates the dataset, records the authenticated user as `created_by` and `updated_by`, saves the selected sensor field mappings and their detected source data types, and writes every selected CSV value to the wide `timeseries` table. |
+| Authentication | `Authorization: Bearer <accessToken>`; `created_by` always comes from the JWT `sub`, never from the request body. |
+| Content type | `application/json` |
+| Transaction behaviour | All inserts succeed or the request is rolled back. No partially imported dataset is visible. |
+| Maximum | 100,000 rows, one timestamp column and 1–8 numeric sensor mappings. |
+
+The frontend parses the selected file locally for the Upload, Map fields, and Review steps. On **Import**, it posts the parsed values for selected columns together with the user-confirmed `mappings`. Unselected CSV columns are not persisted. This avoids re-uploading a file that the user has already reviewed and makes the final request deterministic.
+
+| Body field | Type | Required | Rules |
+| --- | --- | --- |
+| `name` | string | Yes | Trimmed, 1–120 characters; unique dataset name. |
+| `timestampField` | string | Yes | Exact CSV header to write to `timeseries.created_at`. It is not a `dataset_field_mappings` row because only sensor columns can use `field1`–`field8`. |
+| `mappings` | array | Yes | 1–8 sensor mappings to `field1`–`field8`. |
+| `mappings[].sourceField` | string | Yes | Exact CSV header in each row. Unique per dataset. |
+| `mappings[].storageField` | string | Yes | `field1` through `field8`; unique per dataset. |
+| `mappings[].displayName` | string | Yes | User-facing field label, maximum 120 characters. |
+| `mappings[].sourceDataType` | string | Yes | Detected CSV type: `number`, `text`, `datetime`, or `boolean`. Current `field1`–`field8` mappings must use `number`, because their PostgreSQL destination is `DOUBLE PRECISION`. |
+| `rows` | object[] | Yes | Parsed CSV rows keyed by source header. Selected timestamp values must be parseable dates; selected sensor values must be finite numbers or empty (stored as `NULL`). |
+
+```json
+{
+  "name": "microclimate-sensors-april-2026",
+  "timestampField": "Time",
+  "mappings": [
+    { "sourceField": "AirTemperature", "storageField": "field1", "displayName": "Temperature", "sourceDataType": "number" },
+    { "sourceField": "RelativeHumidity", "storageField": "field2", "displayName": "Humidity", "sourceDataType": "number" },
+    { "sourceField": "AtmosphericPressure", "storageField": "field3", "displayName": "Pressure", "sourceDataType": "number" },
+    { "sourceField": "PM25", "storageField": "field4", "displayName": "PM2.5", "sourceDataType": "number" },
+    { "sourceField": "Noise", "storageField": "field5", "displayName": "Noise level", "sourceDataType": "number" }
+  ],
+  "rows": [
+    {
+      "Time": "2026-04-29T01:25:15+10:00",
+      "AirTemperature": "16.7",
+      "RelativeHumidity": "79.9",
+      "AtmosphericPressure": "1026.1",
+      "PM25": "10.0",
+      "Noise": "58.7"
+    }
+  ]
+}
+```
+
+**Success response: `201 Created`**
+
+```json
+{
+  "data": {
+    "id": 42,
+    "name": "microclimate-sensors-april-2026",
+    "createdBy": "4c7c77b9-2bb8-4a3e-9b7a-4a66782e9dd6",
+    "createdAt": "2026-09-04T10:00:00.000Z",
+    "updatedBy": "4c7c77b9-2bb8-4a3e-9b7a-4a66782e9dd6",
+    "updatedAt": "2026-09-04T10:00:00.000Z",
+    "mappings": [
+      { "sourceField": "AirTemperature", "storageField": "field1", "displayName": "Temperature", "sourceDataType": "number" }
+    ],
+    "importedRowCount": 18
+  },
+  "meta": { "requestId": "req_01" }
+}
+```
+
+| Failure case | HTTP status / code | Frontend behaviour |
+| --- | --- | --- |
+| Missing, malformed, duplicate mappings, invalid timestamps/numbers, too many rows | `400` / `VALIDATION_ERROR` | Keep the wizard at review and map `error.fields` to the relevant row or mapping. |
+| No/invalid/expired access token | `401` / `UNAUTHENTICATED` or `ACCESS_TOKEN_EXPIRED` | Refresh once, then return to sign-in if needed. |
+| Dataset name already exists | `409` / `DATASET_NAME_EXISTS` | Ask for a different dataset name; preserve the reviewed data. |
+| Database failure | `500` / `INTERNAL_ERROR` | Leave the user on review; retry is safe because the database transaction was rolled back. |
 
 ## 7. Authentication and session flows
 
