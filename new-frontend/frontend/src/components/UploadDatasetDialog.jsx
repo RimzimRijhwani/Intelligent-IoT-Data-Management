@@ -62,6 +62,32 @@ const UploadDatasetDialog = ({ onClose }) => {
         return "Text";
     };
 
+    const parseCSVLine = (line) => {
+        const values = [];
+        let currentValue = "";
+        let insideQuotes = false;
+
+        for(let i =0; i < line.length; i++){
+            const character = line[i];
+
+            if(character === '"'){
+                if(insideQuotes && line[i+1] ==='"'){
+                    currentValue += '"';
+                    i++;
+
+                }else{
+                    insideQuotes = !insideQuotes;
+                }
+            }else if(character === "," && !insideQuotes){
+                values.push(currentValue.trim());
+                currentValue = "";
+            }else{
+                currentValue += character;
+            }
+        }
+        return values;
+    };
+
     const handleFileChange = (event) => {
         const selectedFile = event.target.files[0];
 
@@ -101,7 +127,7 @@ const UploadDatasetDialog = ({ onClose }) => {
                     return;
                 }
 
-                const headers = lines[0].split(",").map((header) => header.trim());
+                const headers = parseCSVLine(lines[0]);
                 if (headers.length < 2) {
                     setError("CSV file must have a timestamp and sensor column");
 
@@ -114,7 +140,7 @@ const UploadDatasetDialog = ({ onClose }) => {
                 }
 
                 const rows = lines.slice(1, 6).map((line) => {
-                    const values = line.split(",").map((value) => value.trim());
+                    const values = parseCSVLine(line);
                     const row = {};
                     headers.forEach((header, index) => {
                         row[header] = values[index] ?? "";
@@ -270,6 +296,12 @@ const UploadDatasetDialog = ({ onClose }) => {
     const handleConfirm = () => {
         if (!file) {
             setError("Please select a CSV file");
+            return;
+        }
+
+        if(!timestampColumn){
+            setError("Please select a timestamp column before confirming the upload");
+
             return;
         }
         const selectedSensors = columnConfig.filter((column) => column.import);
@@ -531,7 +563,7 @@ const UploadDatasetDialog = ({ onClose }) => {
                 <div className="dialog-actions">
 
                     <button type="button" className="cancel-button" onClick={onClose}>Cancel </button>
-                    <button type="button" className="confirm-button" onClick={handleConfirm} disabled={!file}>Confirm</button>
+                    <button type="button" className="confirm-button" onClick={handleConfirm} disabled={!file || !timestampColumn}>Confirm</button>
 
                 </div>
 
