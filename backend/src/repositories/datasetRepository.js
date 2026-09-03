@@ -18,10 +18,18 @@ const repositoryError = (code, status, message) =>
 class DatasetRepository {
   async findAll() {
     const result = await db.query(`
-      SELECT id, name, created_by AS "createdBy", updated_by AS "updatedBy",
-             created_at AS "createdAt", updated_at AS "updatedAt"
-      FROM datasets
-      ORDER BY id ASC
+      SELECT
+        d.id,
+        d.name,
+        COUNT(t.entry_id)::integer AS "totalRows",
+        d.created_by AS "createdBy",
+        d.updated_by AS "updatedBy",
+        d.created_at AS "createdAt",
+        d.updated_at AS "updatedAt"
+      FROM datasets d
+      LEFT JOIN timeseries t ON t.dataset_id = d.id
+      GROUP BY d.id, d.name, d.created_by, d.updated_by, d.created_at, d.updated_at
+      ORDER BY d.id ASC
     `);
     return result.rows;
   }
