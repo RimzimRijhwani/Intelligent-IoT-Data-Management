@@ -78,6 +78,7 @@ test("the authenticated user id and reviewed mappings are passed to the transact
   const result = await importDataset(
     {
       name: "Microclimate April",
+      description: "April microclimate readings.",
       timestampField: "Time",
       mappings,
       rows: [
@@ -93,6 +94,8 @@ test("the authenticated user id and reviewed mappings are passed to the transact
   );
   assert.deepEqual(result, { id: 42 });
   assert.equal(received.userId, "4c7c77b9-2bb8-4a3e-9b7a-4a66782e9dd6");
+  assert.equal(received.description, "April microclimate readings.");
+  assert.equal(received.timestampField, "Time");
   assert.equal(received.mappings[0].displayName, "Temperature");
   assert.equal(received.wideRows[0].field2, 79.9);
 });
@@ -121,6 +124,7 @@ test("PUT accepts the same reviewed CSV payload as POST", async () => {
   assert.deepEqual(result, { id: 42, addedRowCount: 1 });
   assert.equal(received.id, 42);
   assert.equal(received.user, user);
+  assert.equal(received.timestampField, "Time");
   assert.equal(received.wideRows[0].entryId, 1);
   assert.equal(received.wideRows[0].field1, 16.7);
 });

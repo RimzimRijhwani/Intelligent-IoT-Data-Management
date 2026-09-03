@@ -37,10 +37,38 @@ class DatasetRepository {
   async findById(id) {
     const result = await db.query(
       `
-      SELECT id, name, created_by AS "createdBy", updated_by AS "updatedBy",
-             created_at AS "createdAt", updated_at AS "updatedAt"
-      FROM datasets
-      WHERE id = $1
+      SELECT
+        d.id,
+        d.name,
+        d.description,
+        d.timestamp_field AS "timestampField",
+        d.created_by AS "createdBy",
+        d.updated_by AS "updatedBy",
+        d.created_at AS "createdAt",
+        d.updated_at AS "updatedAt",
+        (
+          SELECT COUNT(*)::integer
+          FROM timeseries t
+          WHERE t.dataset_id = d.id
+        ) AS "totalRows",
+        COALESCE(
+          (
+            SELECT json_agg(
+              json_build_object(
+                'sourceField', m.source_field,
+                'storageField', m.storage_field,
+                'sourceDataType', m.source_data_type,
+                'displayName', m.display_name
+              )
+              ORDER BY m.storage_field
+            )
+            FROM dataset_field_mappings m
+            WHERE m.dataset_id = d.id
+          ),
+          '[]'::json
+        ) AS mappings
+      FROM datasets d
+      WHERE d.id = $1
       `,
       [id]
     );
@@ -82,6 +110,8 @@ class DatasetRepository {
    */
   async createWithMappingsAndRows({
     name,
+    description,
+    timestampField,
     mappings,
     wideRows,
     userId,
@@ -90,11 +120,12 @@ class DatasetRepository {
     try {
       await client.query("BEGIN");
       const datasetResult = await client.query(
-        `INSERT INTO datasets (name, created_by, updated_by)
-         VALUES ($1, $2, $2)
-         RETURNING id, name, created_by AS "createdBy", updated_by AS "updatedBy",
+        `INSERT INTO datasets (name, description, timestamp_field, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $4)
+         RETURNING id, name, description, timestamp_field AS "timestampField",
+                   created_by AS "createdBy", updated_by AS "updatedBy",
                    created_at AS "createdAt", updated_at AS "updatedAt"`,
-        [name, userId],
+        [name, description || null, timestampField, userId],
       );
       const dataset = datasetResult.rows[0];
 
@@ -137,7 +168,7 @@ class DatasetRepository {
     }
   }
 
-  async replaceMappingsAndAddRows(datasetId, { mappings, wideRows, user }) {
+  async replaceMappingsAndAddRows(datasetId, { description, timestampField, mappings, wideRows, user }) {
     const client = await db.connect();
     try {
       await client.query("BEGIN");
@@ -180,10 +211,13 @@ class DatasetRepository {
       }
 
       const updatedResult = await client.query(
-        `UPDATE datasets SET updated_by = $2, updated_at = CURRENT_TIMESTAMP
+        `UPDATE datasets
+         SET description = COALESCE($2, description), timestamp_field = $3,
+             updated_by = $4, updated_at = CURRENT_TIMESTAMP
          WHERE id = $1
-         RETURNING id, updated_by AS "updatedBy", updated_at AS "updatedAt"`,
-        [datasetId, user.sub],
+         RETURNING id, description, timestamp_field AS "timestampField",
+                   updated_by AS "updatedBy", updated_at AS "updatedAt"`,
+        [datasetId, description, timestampField, user.sub],
       );
       await client.query("COMMIT");
       return {
