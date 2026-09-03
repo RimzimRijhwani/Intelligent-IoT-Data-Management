@@ -6,7 +6,7 @@ Use this document as the single source of truth for the MVP API release.
 
 | Field | Value |
 | --- | --- |
-| Contract version | `v1.1.0` |
+| Contract version | `v1.2.0` |
 | Status | Approved contract baseline - BE implementation pending |
 | API base URL | Local: `http://localhost:3000/api`; deployed: `VITE_API_BASE_URL` ending in `/api` over HTTPS |
 | Related tickets | `AFI-14`, `AFI-16` |
@@ -37,7 +37,9 @@ Use this document as the single source of truth for the MVP API release.
 | AUTH-06 | `POST` | `/api/auth/logout` | Revoke current session | Refresh cookie | FE | BE pending |
 | AUTH-07 | `POST` | `/api/auth/password-reset/request` | Request reset instructions | None | FE | BE pending |
 | AUTH-08 | `POST` | `/api/auth/password-reset/confirm` | Confirm password reset | None | FE | BE pending |
-| DATA-01 | `POST` | `/api/datasets` | Persist a reviewed CSV dataset, its mappings and mapped time-series rows | Bearer access token | FE upload wizard | Implemented |
+| DATA-01 | `GET` | `/api/datasets` | List datasets with their total persisted row counts | None | FE dataset selector | Implemented |
+| DATA-02 | `POST` | `/api/datasets` | Persist a reviewed CSV dataset, its mappings and mapped time-series rows | Bearer access token | FE upload wizard | Implemented |
+| DATA-03 | `PUT` | `/api/datasets/:id` | Replace mapping metadata and append reviewed CSV rows | Bearer access token | FE dataset editor | Implemented |
 
 ## 4. Data and naming rules
 
@@ -595,6 +597,54 @@ The request uses the same timestamp, mapping, and row fields as `POST /api/datas
   }
 }
 ```
+
+### 6.11 DATA-03- GET /api/datasets
+
+| Field | Value |
+| --- | --- |
+| Purpose | List every dataset and the total number of persisted wide time-series rows it contains. |
+| Authentication | None |
+| Content type | `application/json` |
+| Ordering | Ascending dataset ID. |
+
+`totalRows` is the count of records in the `timeseries` table for the dataset. A dataset with no persisted records is included with `totalRows: 0`.
+
+**Success response: `200 OK`**
+
+```json
+[
+  {
+    "id": 42,
+    "name": "microclimate-sensors-april-2026",
+    "totalRows": 18,
+    "createdBy": "4c7c77b9-2bb8-4a3e-9b7a-4a66782e9dd6",
+    "updatedBy": "4c7c77b9-2bb8-4a3e-9b7a-4a66782e9dd6",
+    "createdAt": "2026-09-04T10:00:00.000Z",
+    "updatedAt": "2026-09-04T10:00:00.000Z"
+  },
+  {
+    "id": 43,
+    "name": "empty-dataset",
+    "totalRows": 0,
+    "createdBy": "4c7c77b9-2bb8-4a3e-9b7a-4a66782e9dd6",
+    "updatedBy": "4c7c77b9-2bb8-4a3e-9b7a-4a66782e9dd6",
+    "createdAt": "2026-09-04T10:05:00.000Z",
+    "updatedAt": "2026-09-04T10:05:00.000Z"
+  }
+]
+```
+
+| Response field | Type | Description |
+| --- | --- | --- |
+| `id` | integer | Dataset identifier. |
+| `name` | string | Unique dataset name. |
+| `totalRows` | integer | Total persisted wide time-series rows for the dataset. |
+| `createdBy`, `updatedBy` | UUID or `null` | User IDs recorded in the dataset audit fields. |
+| `createdAt`, `updatedAt` | ISO-8601 timestamp | Dataset audit timestamps. |
+
+| Failure case | HTTP status / response | Frontend behaviour |
+| --- | --- | --- |
+| Database failure | `500` / `{ "error": "Failed to load datasets" }` | Preserve the current selection and offer retry. |
 
 ## 7. Authentication and session flows
 
