@@ -251,62 +251,83 @@ const Dashboard = ({ datasetId }) => {
       </section>
 
       <section className="dashboard-section stream-panel">
-        <h3 className="section-title">Available Streams</h3>
-        <p className="stream-list">{streamNames.map((s) => s.name).join(', ')}</p>
-      </section>
+  <h3 className="section-title">Available Streams</h3>
+
+  <div className="available-streams-grid">
+    {streamNames.length > 0 ? (
+      streamNames.map((stream) => (
+        <div className="available-stream-card" key={stream.name}>
+          {stream.name}
+        </div>
+      ))
+    ) : (
+      <p className="no-streams-message">No streams available</p>
+    )}
+  </div>
+</section>
 
       <section className="dashboard-section controls-panel">
-        <h3 className="section-title">Controls</h3>
+  <h3 className="section-title">Stream Selector</h3>
 
-        <div className="selector-grid">
-          <div className="selector-group">
-            <StreamSelector
-              streams={streamNames.map(s => s.name)}
-              selectedStreams={selectedStreams}
-              setSelectedStreams={setSelectedStreams}
-            />
-          </div>
-          <div className="selector-group">
-            <IntervalSelector
-              intervals={intervals}
-              selectedInterval={selectedInterval}
-              setSelectedInterval={setSelectedInterval}
-            />
-          </div>
+  <div className="figma-controls-row">
+    <div className="figma-control-item">
+      <label>Select Streams</label>
 
-          <div className="time-controls-wrapper">
-            <div className='time-controls'>
-              <button
-                className="time-range-toggle"
-                onClick={() => setShowTimePanel(prev => !prev)}>
-                {finalStartTime && finalEndTime
-                  ? formatTimeRange(finalStartTime, finalEndTime, timeMode, relativeRange)
-                  : "Select Time Range ▼"}
-              </button>
+      <StreamSelector
+        streams={streamNames.map((s) => s.name)}
+        selectedStreams={selectedStreams}
+        setSelectedStreams={setSelectedStreams}
+      />
+    </div>
 
-              <button className="refresh-btn" onClick={handleRefresh}>
-                ⟳
-              </button>
-            </div>
-          </div>
-          {showTimePanel && (
-            <div className="time-range-overlay">
-              <TimeRangePanel
-                timeOptions={timeOptions}
-                selectedTimeStart={selectedTimeStart}
-                setSelectedTimeStart={setSelectedTimeStart}
-                selectedTimeEnd={selectedTimeEnd}
-                setSelectedTimeEnd={setSelectedTimeEnd}
-                timeMode={timeMode}
-                setTimeMode={setTimeMode}
-                relativeRange={relativeRange}
-                setRelativeRange={setRelativeRange}
-                onAnalyze={handleSubmit}
-              />
-            </div>
-          )}
+    <div className="figma-control-item">
+      <label>Time Interval</label>
+
+      <IntervalSelector
+        intervals={intervals}
+        selectedInterval={selectedInterval}
+        setSelectedInterval={setSelectedInterval}
+      />
+    </div>
+
+    <div className="figma-control-item figma-time-item">
+      <label>Time Range</label>
+
+      <button
+        className="figma-time-button"
+        onClick={() => setShowTimePanel((prev) => !prev)}
+      >
+        <span>▣</span>
+        <span>Select Time Range</span>
+        <span>⌄</span>
+      </button>
+
+      {showTimePanel && (
+        <div className="time-range-overlay">
+          <TimeRangePanel
+            timeOptions={timeOptions}
+            selectedTimeStart={selectedTimeStart}
+            setSelectedTimeStart={setSelectedTimeStart}
+            selectedTimeEnd={selectedTimeEnd}
+            setSelectedTimeEnd={setSelectedTimeEnd}
+            timeMode={timeMode}
+            setTimeMode={setTimeMode}
+            relativeRange={relativeRange}
+            setRelativeRange={setRelativeRange}
+            onAnalyze={handleSubmit}
+          />
         </div>
-      </section>
+      )}
+    </div>
+
+    <button
+      className="figma-refresh-button"
+      onClick={handleRefresh}
+    >
+      ⟳ Refresh
+    </button>
+  </div>
+</section>
 
       <section className="dashboard-section insights-panel">
         <h3 className="section-title">Insight Cards</h3>

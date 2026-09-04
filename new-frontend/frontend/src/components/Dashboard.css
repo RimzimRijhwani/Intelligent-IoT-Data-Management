@@ -570,3 +570,143 @@
   right: 0;
   z-index: 9999;
 }
+
+/* =========================
+   FIGMA - AVAILABLE STREAMS
+========================= */
+
+.available-streams-grid {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.available-stream-card {
+  width: 115px;
+  height: 46px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  background: #e4ecff;
+  border-radius: 4px;
+
+  color: #111;
+}
+
+.available-stream-card strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.available-stream-card span {
+  font-size: 9px;
+  margin-top: 1px;
+}
+
+
+/* =========================
+   FIGMA - CONTROLS
+========================= */
+
+.figma-controls-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 55px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+.figma-control-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.figma-control-item label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #111;
+}
+
+.figma-time-item {
+  position: relative;
+}
+
+.figma-time-button {
+  width: 170px;
+  height: 36px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 10px;
+
+  background: #fff;
+  border: 1px solid #333;
+  border-radius: 4px;
+
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.figma-refresh-button {
+  height: 36px;
+  padding: 0 16px;
+
+  border: none;
+  border-radius: 6px;
+
+  background: #b8ccff;
+  color: #2563eb;
+
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.figma-refresh-button:hover {
+  background: #a7bfff;
+}
+
+
+/* Keep popup under time selector */
+.time-range-overlay {
+  position: absolute;
+  top: 65px;
+  left: 0;
+  z-index: 1000;
+}
+
+/* Available Streams - Figma design */
+.available-streams-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-top: 20px;
+}
+
+.available-stream-card {
+  min-width: 110px;
+  padding: 12px 16px;
+  background: #e4ecff;
+  border-radius: 4px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  text-align: center;
+}
+
+.no-streams-message {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
