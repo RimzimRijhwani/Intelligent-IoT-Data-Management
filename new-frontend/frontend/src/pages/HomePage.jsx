@@ -24,7 +24,12 @@ const features = [
 ];
 
 const HomePage = () => {
-  const { datasets, loading, error } = useDatasets();
+  const {
+  datasets,
+  loading,
+  error,
+  refreshDatasets,
+} = useDatasets();
   const [showUploadDialog,setShowUploadDialog] = useState(false);
   const streamCount = datasets.reduce(
     (total, dataset) => total + Number(dataset.streams || 0),
@@ -159,7 +164,10 @@ const HomePage = () => {
 
         {showUploadDialog && (
           <UploadDatasetDialog
-          onClose={() => setShowUploadDialog(false)}
+            onClose={() => {
+              setShowUploadDialog(false);
+              refreshDatasets();
+            }}
           />
           )}
       </main>

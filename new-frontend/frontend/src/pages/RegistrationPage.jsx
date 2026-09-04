@@ -1,3 +1,4 @@
+import { registerUser } from "../services/authClient";
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./RegistrationPage.css";
@@ -89,41 +90,42 @@ const RegistrationPage = () => {
     return Object.values(newErrors).every((err) => err === "");
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setSubmitted(true);
-    setFormError("");
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  setSubmitted(true);
+  setFormError("");
 
-    const isValid = runFullValidation();
-    if (!isValid) {
-      setFormError("Please fix the highlighted fields before continuing.");
-      return;
-    }
+  const isValid = runFullValidation();
+  if (!isValid) {
+    setFormError("Please fix the highlighted fields before continuing.");
+    return;
+  }
 
-    const existingUsers = JSON.parse(localStorage.getItem("registeredUsers")) || [];
-    const emailTaken = existingUsers.some(
-      (user) => user.email.toLowerCase() === formData.email.trim().toLowerCase()
-    );
-
-    if (emailTaken) {
-      setErrors((prev) => ({ ...prev, email: "An account with this email already exists." }));
-      setFormError("An account with this email already exists. Try logging in instead.");
-      return;
-    }
-
-    const newUser = {
-      fullName: formData.fullName.trim(),
+  try {
+    await registerUser({
       email: formData.email.trim(),
       password: formData.password,
-    };
-
-    localStorage.setItem("registeredUsers", JSON.stringify([...existingUsers, newUser]));
-    localStorage.setItem("registeredUser", JSON.stringify(newUser));
+      confirmPassword: formData.confirmPassword,
+    });
 
     setFormError("");
     navigate("/");
-  };
+  } catch (error) {
+    const backendError = error.response?.data?.error;
 
+    if (backendError?.fields) {
+      setErrors((prev) => ({
+        ...prev,
+        ...backendError.fields,
+      }));
+    }
+
+    setFormError(
+      backendError?.message ||
+        "Unable to create your account. Please try again."
+    );
+  }
+};
   const fieldClass = (name) =>
     `auth-input${touched[name] && errors[name] ? " auth-input-invalid" : ""}`;
 

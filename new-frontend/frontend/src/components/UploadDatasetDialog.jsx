@@ -1,3 +1,4 @@
+import { createDataset } from "../services/datasetService";
 import { useState } from "react";
 import "./UploadDatasetDialog.css";
 
@@ -15,11 +16,15 @@ const predefinedFields = [
 
 const UploadDatasetDialog = ({ onClose }) => {
     const [file, setFile] = useState(null);
+    const [datasetName, setDatasetName] = useState("");
     const [columns, setColumns] = useState([]);
     const [previewData, setPreviewData] = useState([]);
+    const [allRows, setAllRows] = useState([]);
     const [timestampColumn, setTimestampColumn] = useState("");
     const [columnConfig, setColumnConfig] = useState([]);
     const [error, setError] = useState("");
+    const [successMessage, setSuccessMessage] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const detectTimestampColumn = (headers) => {
         const timestampNames = [
@@ -37,6 +42,37 @@ const UploadDatasetDialog = ({ onClose }) => {
             timestampNames.includes(header.toLowerCase())
         );
         return detectedColumn || "";
+    };
+
+    // Timestamp validation:
+    // A timestamp column must contain non-empty values
+    // and every value must be parseable as a date.
+    const isValidTimestampColumn = (column, rows) => {
+        if (!column || rows.length === 0) {
+            return false;
+        }
+
+        const values = rows.map((row) => row[column]);
+
+        if (values.some(
+            (value) =>
+                value === undefined ||
+                value === null ||
+                String(value).trim() === ""
+        )) {
+            return false;
+        }
+
+        return values.every((value) => {
+            const textValue = String(value).trim();
+
+            // Prevent ordinary numeric ID columns from being treated as dates.
+            if (/^\d+$/.test(textValue)) {
+                return false;
+            }
+
+            return !Number.isNaN(new Date(textValue).getTime());
+        });
     };
 
     const detectDataType = (column, rows) => {
@@ -85,6 +121,9 @@ const UploadDatasetDialog = ({ onClose }) => {
                 currentValue += character;
             }
         }
+
+        values.push(currentValue.trim());
+
         return values;
     };
 
@@ -97,16 +136,21 @@ const UploadDatasetDialog = ({ onClose }) => {
             setError("Please select a CSV file.");
 
             setFile(null);
+            setDatasetName("");
             setColumns([]);
             setPreviewData([]);
+            setAllRows([]);
             setTimestampColumn("");
             setColumnConfig([]);
+            setSuccessMessage("");
 
             return;
         }
 
         setFile(selectedFile);
+        setDatasetName(selectedFile.name.replace(/\.csv$/i, ""));
         setError("");
+        setSuccessMessage("");
 
         const reader = new FileReader();
 
@@ -121,6 +165,7 @@ const UploadDatasetDialog = ({ onClose }) => {
 
                     setColumns([]);
                     setPreviewData([]);
+                    setAllRows([]);
                     setTimestampColumn("");
                     setColumnConfig([]);
 
@@ -133,13 +178,14 @@ const UploadDatasetDialog = ({ onClose }) => {
 
                     setColumns([]);
                     setPreviewData([]);
+                    setAllRows([]);
                     setTimestampColumn("");
                     setColumnConfig([]);
 
                     return;
                 }
 
-                const rows = lines.slice(1, 6).map((line) => {
+                const parsedRows = lines.slice(1).map((line) => {
                     const values = parseCSVLine(line);
                     const row = {};
                     headers.forEach((header, index) => {
@@ -148,10 +194,26 @@ const UploadDatasetDialog = ({ onClose }) => {
                     return row;
                 });
 
+                const rows = parsedRows.slice(0, 5);
+
                 setColumns(headers);
                 setPreviewData(rows);
+                setAllRows(parsedRows);
 
-                const detectedTimestamp = detectTimestampColumn(headers);
+                // Timestamp validation:
+                // Auto-select the detected timestamp only when its values
+                // are actually valid timestamps.
+                const detectedTimestampCandidate = detectTimestampColumn(headers);
+
+                const detectedTimestamp =
+                    detectedTimestampCandidate &&
+                    isValidTimestampColumn(
+                        detectedTimestampCandidate,
+                        parsedRows
+                    )
+                        ? detectedTimestampCandidate
+                        : "";
+
                 setTimestampColumn(detectedTimestamp);
 
                 const config = headers.filter((header) =>
@@ -161,7 +223,7 @@ const UploadDatasetDialog = ({ onClose }) => {
 
                     dataType: detectDataType(
                         header,
-                        rows
+                        parsedRows
                     ),
                     import: false,
                     backendField: "",
@@ -170,7 +232,21 @@ const UploadDatasetDialog = ({ onClose }) => {
                 }));
 
                 setColumnConfig(config);
-                setError("");
+
+                // Timestamp validation:
+                // Warn if the CSV contains no column whose values
+                // can safely be used as timestamps.
+                const validTimestampColumns = headers.filter((header) =>
+                    isValidTimestampColumn(header, parsedRows)
+                );
+
+                if (validTimestampColumns.length === 0) {
+                    setError(
+                        "No valid timestamp column was found. The timestamp column must contain a valid date or time value in every row."
+                    );
+                } else {
+                    setError("");
+                }
             } catch (err) {
                 console.error(err);
 
@@ -178,6 +254,7 @@ const UploadDatasetDialog = ({ onClose }) => {
 
                 setColumns([]);
                 setPreviewData([]);
+                setAllRows([]);
                 setTimestampColumn("");
                 setColumnConfig([]);
             }
@@ -205,7 +282,7 @@ const UploadDatasetDialog = ({ onClose }) => {
 
                 dataType: detectDataType(
                     column,
-                    previewData
+                    allRows
                 ),
                 import: false,
                 backendField: "",
@@ -214,6 +291,7 @@ const UploadDatasetDialog = ({ onClose }) => {
         });
         setColumnConfig(newConfig);
         setError("");
+        setSuccessMessage("");
     };
 
     const handleImportChange = (index) => {
@@ -252,6 +330,7 @@ const UploadDatasetDialog = ({ onClose }) => {
             );
             setColumnConfig(updatedConfig);
             setError("");
+            setSuccessMessage("");
             return;
         }
 
@@ -266,6 +345,7 @@ const UploadDatasetDialog = ({ onClose }) => {
         );
         setColumnConfig(updatedConfig);
         setError("");
+        setSuccessMessage("");
     };
 
     const handleBackendFieldChange = (index, field) => {
@@ -279,6 +359,7 @@ const UploadDatasetDialog = ({ onClose }) => {
         );
         setColumnConfig(updatedConfig);
         setError("");
+        setSuccessMessage("");
     };
 
     const handleDisplayNameChange = (index, displayName) => {
@@ -291,11 +372,22 @@ const UploadDatasetDialog = ({ onClose }) => {
         );
         setColumnConfig(updatedConfig);
         setError("");
+        setSuccessMessage("");
     };
 
-    const handleConfirm = () => {
+    const handleConfirm = async () => {
         if (!file) {
             setError("Please select a CSV file");
+            return;
+        }
+
+        if (!datasetName.trim()) {
+            setError("Please enter a dataset name");
+            return;
+        }
+
+        if (datasetName.trim().length > 120) {
+            setError("Dataset name must be at most 120 characters");
             return;
         }
 
@@ -304,15 +396,31 @@ const UploadDatasetDialog = ({ onClose }) => {
 
             return;
         }
+
+        // Timestamp validation:
+        // Re-check before sending so the frontend never knowingly submits
+        // an invalid timestamp mapping.
+        if (!isValidTimestampColumn(timestampColumn, allRows)) {
+            setError(
+                "The selected timestamp column contains an invalid or empty timestamp value."
+            );
+            return;
+        }
+
+        if (allRows.length === 0) {
+            setError("CSV file does not contain any data.");
+            return;
+        }
+
         const selectedSensors = columnConfig.filter((column) => column.import);
 
         if (selectedSensors.length === 0) {
-            setError("Please select atleast one sensor column");
+            setError("Please select at least one sensor column");
             return;
         }
 
         if (selectedSensors.length > 8) {
-            setError("A maximum of 8 sensor column can be imported");
+            setError("A maximum of 8 sensor columns can be imported");
 
             return;
         }
@@ -341,23 +449,62 @@ const UploadDatasetDialog = ({ onClose }) => {
             setError("Display names must be unique.");
             return;
         }
+
+        const invalidDisplayName = selectedSensors.some(
+            (column) => column.displayName.trim().length > 120
+        );
+
+        if (invalidDisplayName) {
+            setError("Display names must be at most 120 characters.");
+            return;
+        }
+
         setError("");
+        setSuccessMessage("");
 
         const sensorMappings = selectedSensors.map((column) => ({
-            sourceColumn: column.columnName,
-            field: column.backendField,
+            sourceField: column.columnName,
+            storageField: column.backendField,
             displayName: column.displayName.trim(),
+            sourceDataType: "number",
         }));
 
         const uploadConfig = {
-            file,
-            timestampColumn,
-            sensors: sensorMappings,
+            name: datasetName.trim(),
+            timestampField: timestampColumn,
+            mappings: sensorMappings,
+            rows: allRows,
         };
 
-        console.log("Upload Configuration", uploadConfig);
-        console.log("Timestamp:", timestampColumn);
-        console.log("Sensors:", sensorMappings);
+        try {
+            setIsSubmitting(true);
+
+            await createDataset(uploadConfig);
+
+            setSuccessMessage("Dataset uploaded successfully.");
+            onClose();
+        } catch (err) {
+            console.error(err);
+
+            const backendError = err.response?.data?.error;
+
+            if (backendError?.fields) {
+                const firstFieldError = Object.values(backendError.fields)[0];
+
+                setError(
+                    firstFieldError ||
+                    backendError.message ||
+                    "Unable to upload dataset."
+                );
+            } else {
+                setError(
+                    backendError?.message ||
+                    "Unable to upload dataset. Please try again."
+                );
+            }
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const selectedSensorCount = columnConfig.filter((column) => column.import).length;
@@ -398,9 +545,36 @@ const UploadDatasetDialog = ({ onClose }) => {
                     )}
                 </div>
 
+                {file && (
+                    <div className="file-section">
+                        <label htmlFor="dataset-name">
+                            Dataset Name
+                        </label>
+
+                        <input
+                            id="dataset-name"
+                            type="text"
+                            value={datasetName}
+                            maxLength={120}
+                            onChange={(event) => {
+                                setDatasetName(event.target.value);
+                                setError("");
+                                setSuccessMessage("");
+                            }}
+                            placeholder="Enter dataset name"
+                        />
+                    </div>
+                )}
+
                 {error && (
                     <div className="error-message" role="alert">
                         {error}
+                    </div>
+                )}
+
+                {successMessage && (
+                    <div className="selected-file" role="status">
+                        {successMessage}
                     </div>
                 )}
 
@@ -411,11 +585,17 @@ const UploadDatasetDialog = ({ onClose }) => {
                         <p> Select the column that contains the timestamp for each sensor reading.</p>
                         <select value={timestampColumn} onChange={handleTimestampChange}>
                             <option value=""> Select timestamp column</option>
-                            {columns.map((column) => (
-                                <option key={column} value={column}>
-                                    {column}</option>
-                            )
-                            )}
+
+                            {columns
+                                .filter((column) =>
+                                    isValidTimestampColumn(column, allRows)
+                                )
+                                .map((column) => (
+                                    <option key={column} value={column}>
+                                        {column}</option>
+                                )
+                                )}
+
                         </select>
                         {timestampColumn && (
                             <p className="timestamp-detected">
@@ -562,8 +742,10 @@ const UploadDatasetDialog = ({ onClose }) => {
 
                 <div className="dialog-actions">
 
-                    <button type="button" className="cancel-button" onClick={onClose}>Cancel </button>
-                    <button type="button" className="confirm-button" onClick={handleConfirm} disabled={!file || !timestampColumn}>Confirm</button>
+                    <button type="button" className="cancel-button" onClick={onClose} disabled={isSubmitting}>Cancel </button>
+                    <button type="button" className="confirm-button" onClick={handleConfirm} disabled={!file || !timestampColumn || isSubmitting}>
+                        {isSubmitting ? "Uploading..." : "Confirm"}
+                    </button>
 
                 </div>
 

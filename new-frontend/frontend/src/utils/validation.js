@@ -10,7 +10,7 @@ export function validateEmail(value) {
 export function getPasswordRules(password) {
   const value = password || "";
   return [
-    { id: "length", label: "At least 8 characters", valid: value.length >= 8 },
+    { id: "length", label: "12-128 characters", valid: value.length >= 12 && value.length <= 128 },
     { id: "upper", label: "One uppercase letter", valid: /[A-Z]/.test(value) },
     { id: "lower", label: "One lowercase letter", valid: /[a-z]/.test(value) },
     { id: "number", label: "One number", valid: /\d/.test(value) },
