@@ -24,13 +24,8 @@ const features = [
 ];
 
 const HomePage = () => {
-  const {
-  datasets,
-  loading,
-  error,
-  refreshDatasets,
-} = useDatasets();
-  const [showUploadDialog,setShowUploadDialog] = useState(false);
+  const { datasets, loading, error, refreshDatasets } = useDatasets();
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
   const streamCount = datasets.reduce(
     (total, dataset) => total + Number(dataset.streams || 0),
     0,
@@ -49,7 +44,10 @@ const HomePage = () => {
 
     if (error) {
       return (
-        <div className="homepage__dataset-state homepage__dataset-state--error" role="alert">
+        <div
+          className="homepage__dataset-state homepage__dataset-state--error"
+          role="alert"
+        >
           <h3>Unable to load datasets</h3>
           <p>Please refresh the page or try again later.</p>
         </div>
@@ -58,9 +56,13 @@ const HomePage = () => {
 
     if (datasets.length === 0) {
       return (
-        <div className="homepage__dataset-state">
-          <h3>No datasets available</h3>
-          <p>New sensor datasets will appear here when they are added.</p>
+        <div className="homepage__grid">
+          <div className="homepage__dataset-state">
+            <h3>No datasets available</h3>
+            <p>You can upload a CSV dataset to get started.</p>
+          </div>
+
+          <UploadDatasetCard onClick={() => setShowUploadDialog(true)} />
         </div>
       );
     }
@@ -71,9 +73,7 @@ const HomePage = () => {
           <DatasetCard key={dataset.id} {...dataset} />
         ))}
 
-        <UploadDatasetCard
-        onClick={() => setShowUploadDialog(true)}
-         />
+        <UploadDatasetCard onClick={() => setShowUploadDialog(true)} />
       </div>
     );
   };
@@ -169,7 +169,7 @@ const HomePage = () => {
               refreshDatasets();
             }}
           />
-          )}
+        )}
       </main>
     </>
   );

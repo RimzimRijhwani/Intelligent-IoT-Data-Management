@@ -14,6 +14,10 @@ const predefinedFields = [
 ];
 
 
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_FILE_SIZE_LABEL = "10 MB";
+
+
 const UploadDatasetDialog = ({ onClose }) => {
     const [file, setFile] = useState(null);
     const [datasetName, setDatasetName] = useState("");
@@ -143,6 +147,27 @@ const UploadDatasetDialog = ({ onClose }) => {
             setTimestampColumn("");
             setColumnConfig([]);
             setSuccessMessage("");
+
+            return;
+        }
+
+
+
+        if (selectedFile.size > MAX_FILE_SIZE_BYTES) {
+            setError(
+                `The selected CSV file exceeds the ${MAX_FILE_SIZE_LABEL} upload limit.`
+            );
+
+            setFile(null);
+            setDatasetName("");
+            setColumns([]);
+            setPreviewData([]);
+            setAllRows([]);
+            setTimestampColumn("");
+            setColumnConfig([]);
+            setSuccessMessage("");
+
+            event.target.value = "";
 
             return;
         }
