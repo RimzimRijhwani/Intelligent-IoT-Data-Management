@@ -301,10 +301,6 @@ const ForgotPassword = () => {
             </Link>
           </>
         )}
-
-
-        
-
         {message && (
           <p className="forgot-error">{message}</p>
         )}
