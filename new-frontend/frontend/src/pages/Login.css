@@ -288,6 +288,19 @@
   gap: 12px;
 }
 
+.mfa-resend-timer {
+  margin: 20px 0 0;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.mfa-resend-timer strong {
+  color: var(--primary-dark);
+  font-variant-numeric: tabular-nums;
+}
+
 .text-button {
   background: none;
   border: none;
