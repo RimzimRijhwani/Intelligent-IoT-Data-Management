@@ -119,8 +119,7 @@ const getRawAlertValue = (
   stream,
   streamLabels
 ) => {
-  const supportingValues =
-    alert?.supporting_values;
+  const supportingValues = alert?.supporting_values;
 
   if (
     !supportingValues ||
@@ -193,7 +192,7 @@ const TimelineTooltip = ({
         </strong>
 
         <div>
-          {formatTimestamp(label)}
+          {formatTimestamp(alert?.timestamp || label)}
         </div>
 
         <div>
@@ -326,13 +325,32 @@ const Chart = ({
   );
 
   /*
-   * Map every anomaly to the closest
-   * visible chart timestamp.
+   * Determine the currently visible time range
+   * once before processing anomaly alerts.
+   */
+  const visibleTimes = chartData
+    .map((row) =>
+      new Date(row.created_at).getTime()
+    )
+    .filter(Number.isFinite);
+
+  const visibleStart =
+    visibleTimes.length > 0
+      ? Math.min(...visibleTimes)
+      : null;
+
+  const visibleEnd =
+    visibleTimes.length > 0
+      ? Math.max(...visibleTimes)
+      : null;
+
+  /*
+   * Map anomalies within the visible time
+   * range to the closest chart timestamp.
    *
-   * This is important because filtering/
-   * intervals may mean the Analytics
-   * timestamp is not exactly equal to a
-   * displayed chart point.
+   * Alerts outside the visible range are
+   * ignored so they are not incorrectly
+   * attached to the first or last point.
    */
   anomalyAlerts.forEach((alert) => {
     const stream = findMatchingStream(
@@ -350,6 +368,27 @@ const Chart = ({
     ).getTime();
 
     if (!Number.isFinite(alertTime)) {
+      return;
+    }
+
+    /*
+     * Do not attach an out-of-range anomaly
+     * to the nearest visible chart point.
+     */
+    console.log('Anomaly range check:', {
+      anomalyTime: alert.timestamp,
+      visibleStart: new Date(visibleStart).toISOString(),
+      visibleEnd: new Date(visibleEnd).toISOString(),
+      inRange:
+        alertTime >= visibleStart &&
+        alertTime <= visibleEnd,
+    });
+    if (
+      visibleStart === null ||
+      visibleEnd === null ||
+      alertTime < visibleStart ||
+      alertTime > visibleEnd
+    ) {
       return;
     }
 
