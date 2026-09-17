@@ -426,26 +426,36 @@ const Dashboard = ({ datasetId }) => {
 
       {/* ✅ THIS IS THE FIXED SECTION THAT READS DIRECTLY FROM BACKEND ✅ */}
       <section className="dashboard-section stream-panel">
-        <h3 className="section-title">Available Streams</h3>
-        <div className="streams-container">
-          {sensorData.metadata?.streams?.map((stream, index) => {
-            // ✅ USE THE EXACT SAME streamLabels FALLBACK AS THE DROPDOWN ✅
-            const displayName = streamLabels[stream.id] || stream.id;
-    
-            return (
-              <div 
-                key={index} 
-                className={`stream-chip ${selectedStream === stream.id ? 'selected' : ''}`}
-                onClick={() => setSelectedStream(stream.id)}
-                tabIndex={0}
-              >
-                <span className="stream-name">{displayName}</span>
-                {stream.unit && <span className="stream-unit">({stream.unit})</span>}
-              </div>
+  <h3 className="section-title">Available Streams</h3>
+  <div className="streams-container">
+    {sensorData.metadata?.streams?.map((stream, index) => {
+      const displayName = streamLabels[stream.id] || stream.id;
+      const isSelected = selectedStreams.includes(stream.id);
+
+      return (
+        <div 
+          key={index} 
+          className={`stream-chip ${isSelected ? 'selected' : ''}`}
+          onClick={() => {
+            // Toggle stream selection
+            setSelectedStreams(prev =>
+              prev.includes(stream.id)
+                ? prev.filter(s => s !== stream.id)
+                : [...prev, stream.id]
             );
-          })}
+          }}
+          tabIndex={0}
+          role="button"
+          aria-pressed={isSelected}
+        >
+          {isSelected && <span className="checkmark">✓</span>}
+          <span className="stream-name">{displayName}</span>
+          {stream.unit && <span className="stream-unit">({stream.unit})</span>}
         </div>
-      </section>
+      );
+    })}
+  </div>
+</section>
 
       {/* =====================================================
           CONTROL PANEL
