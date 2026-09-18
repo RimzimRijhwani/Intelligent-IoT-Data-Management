@@ -187,7 +187,6 @@ function Login() {
       const response = await verifyTwoFactorCode({
         mfaChallengeId,
         otp: enteredCode,
-        rememberMe,
       });
 
       const accessToken = response.data?.accessToken;
