@@ -22,7 +22,7 @@ function createApp() {
   app.use(
     cors({ origin: origin ? origin.split(",") : true, credentials: true }),
   );
-  app.use(express.json());
+  app.use(express.json({ limit: MAX_DATASET_REQUEST_SIZE }));
   app.use(cookieParser);
   app.get("/", (_req, res) => res.send("Backend is running"));
   app.get("/health", (_req, res) =>
@@ -34,18 +34,28 @@ function createApp() {
   );
   app.get("/ready", (_req, res) =>
     process.env.NODE_ENV === "production" && !process.env.JWT_SECRET
-      ? res
-          .status(503)
-          .json({
-            error: {
-              code: "READY_DEPENDENCY_UNAVAILABLE",
-              message: "Authentication configuration is unavailable.",
-            },
-          })
+      ? res.status(503).json({
+          error: {
+            code: "READY_DEPENDENCY_UNAVAILABLE",
+            message: "Authentication configuration is unavailable.",
+          },
+        })
       : res.json({ status: "ready" }),
   );
   app.use("/api", apiRoutes);
   app.use("/api", authRoutes);
+  app.use((err, _req, res, next) => {
+    if (err?.type === "entity.too.large") {
+      return res.status(413).json({
+        error: {
+          code: "PAYLOAD_TOO_LARGE",
+          message: `Dataset request exceeds the ${MAX_DATASET_REQUEST_SIZE_LABEL} limit.`,
+        },
+      });
+    }
+
+    return next(err);
+  });
   return app;
 }
 module.exports = createApp();
