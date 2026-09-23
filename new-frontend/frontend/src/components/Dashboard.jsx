@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef, } from 'react';
 import { useSensorData } from '../hooks/useSensorData.js';
 import { useFilteredData } from '../hooks/useFilteredData.js';
 import { useStreamNames } from '../hooks/useStreamNames.js';
@@ -54,13 +54,34 @@ const Dashboard = ({ datasetId }) => {
 
   const [selectedTimeStart, setSelectedTimeStart] = useState('');
   const [selectedTimeEnd, setSelectedTimeEnd] = useState('');
-  const [selectedStreams, setSelectedStreams] = useState([]);
-  const [selectedStream, setSelectedStream] = useState(null); // Added for chip highlighting
+  const [selectedStreams, setSelectedStreams] = useState([]); // Added for chip highlighting
 
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState(null);
   const [hasAnalysed, setHasAnalysed] = useState(false);
+
+  // Redirect from individual insight chart to general timeline and highlight it
+  const [focusedStream, setFocusedStream] = useState(null);
+  const sensorTimelineRef = useRef(null);
+
+  const handleInsightChartClick = useCallback((stream) => {
+    setFocusedStream(stream);
+
+    sensorTimelineRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }, []);
+
+  useEffect(() => {
+    if (
+      focusedStream &&
+      !selectedStreams.includes(focusedStream)
+    ) {
+      setFocusedStream(null);
+    }
+  }, [focusedStream, selectedStreams]);
 
   useEffect(() => {
     setAnalysisResult(null);
@@ -397,23 +418,33 @@ const Dashboard = ({ datasetId }) => {
         <h3 className="section-title">Available Streams</h3>
         <div className="streams-container">
           {sensorData.metadata?.streams?.map((stream, index) => {
-            // ✅ USE THE EXACT SAME streamLabels FALLBACK AS THE DROPDOWN ✅
             const displayName = streamLabels[stream.id] || stream.id;
-    
+            const isSelected = selectedStreams.includes(stream.id);
+
             return (
               <div 
                 key={index} 
-                className={`stream-chip ${selectedStream === stream.id ? 'selected' : ''}`}
-                onClick={() => setSelectedStream(stream.id)}
-                tabIndex={0}
-              >
-                <span className="stream-name">{displayName}</span>
-                {stream.unit && <span className="stream-unit">({stream.unit})</span>}
-              </div>
-            );
-          })}
-        </div>
-      </section>
+                className={`stream-chip ${isSelected ? 'selected' : ''}`}
+                onClick={() => {
+            // Toggle stream selection
+                  setSelectedStreams(prev =>
+                    prev.includes(stream.id)
+                      ? prev.filter(s => s !== stream.id)
+                      : [...prev, stream.id]
+              );
+            }}
+            tabIndex={0}
+            role="button"
+            aria-pressed={isSelected}
+       >     
+            {isSelected && <span className="checkmark">✓</span>}
+            <span className="stream-name">{displayName}</span>
+            {stream.unit && <span className="stream-unit">({stream.unit})</span>}
+          </div>
+        );
+      })}
+    </div>
+  </section>
 
       {/* =====================================================
           CONTROL PANEL
@@ -572,18 +603,20 @@ const Dashboard = ({ datasetId }) => {
           </div>
         ) : (
           <div className="stream-stats">
-           {selectedStreams.map((stream) => (
-            <StreamStats
-              key={stream}
-              data={filteredData}
-              stream={stream}
-              displayName={
-                streamLabels[stream] ||
-                STREAM_LABELS[stream] ||
-                stream
-              }
-            />
-            ))}
+           {selectedStreams.map((stream, index) => (
+             <StreamStats
+               key={stream}
+               data={filteredData}
+               stream={stream}
+               colorIndex={index}
+               displayName={
+                 streamLabels[stream] ||
+                 STREAM_LABELS[stream] ||
+                 stream
+               }
+               onChartClick={() => handleInsightChartClick(stream)}
+             />
+  ))}
           </div>
         )}
       </section>
@@ -599,13 +632,28 @@ const Dashboard = ({ datasetId }) => {
         summary={analysisResult?.summary ?? null}
       />
       <div className="chart-analysis-grid">
-        <section className="dashboard-section chart-analysis-card sensor-timeline-card">
-          <h3 className="section-title chart-section-title">
-            Sensor Timeline
-            {selectedStreams.length >= 2 && (
-              <span> (normalised view)</span>
-            )}
-          </h3>
+        <section
+          ref={sensorTimelineRef}
+          className="dashboard-section chart-analysis-card sensor-timeline-card"
+        >
+          <div className="sensor-timeline-header">
+            <h3 className="section-title chart-section-title">
+              Sensor Timeline
+              {selectedStreams.length >= 2 && (
+                <span> (normalised view)</span>
+              )}
+            </h3>
+
+            {focusedStream && (
+              <button
+                type="button"
+                className="clear-highlight-btn"
+                onClick={() => setFocusedStream(null)}
+             >
+                Clear {streamLabels[focusedStream] || focusedStream} highlight
+              </button>
+         )}
+         </div>
 
           <p className="sensor-timeline-description">
             {selectedStreams.length >= 2
@@ -618,6 +666,7 @@ const Dashboard = ({ datasetId }) => {
             selectedStreams={selectedStreams}
             streamLabels={streamLabels}
             alerts={analysisResult?.alerts ?? []}
+            highlightedStream={focusedStream}
           />
         </section>
 
