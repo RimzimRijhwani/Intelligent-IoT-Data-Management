@@ -95,3 +95,31 @@ export const getAuthHeaders = () =>
         Authorization: `Bearer ${accessToken}`,
       }
     : {};
+
+export const authenticatedFetch = async (input, init = {}) => {
+  let token = accessToken;
+  if (!token) {
+    await refreshSession();
+    token = accessToken;
+  }
+
+  const makeRequest = (accessToken) => {
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", `Bearer ${accessToken}`);
+    return fetch(input, {
+      ...init,
+      headers,
+      credentials: init.credentials || "include",
+    });
+  };
+
+  let response = await makeRequest(token);
+  if (response.status !== 401) return response;
+
+  const error = await response.clone().json().catch(() => null);
+  if (error?.error?.code !== "ACCESS_TOKEN_EXPIRED") return response;
+
+  await refreshSession();
+  response = await makeRequest(accessToken);
+  return response;
+};

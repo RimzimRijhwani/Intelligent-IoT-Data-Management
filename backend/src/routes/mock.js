@@ -8,6 +8,7 @@ const {
   getDataProfileSummary,
   postTopCorrelatedPair
 } = require('../controllers/mockController');
+const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -30,7 +31,7 @@ const router = express.Router();
  *   ...
  * ]
  */
-router.get('/streams', getStreams);
+router.get('/streams', authMiddleware, getStreams);
 
 /*
  * GET /stream-names
@@ -46,7 +47,7 @@ router.get('/streams', getStreams);
  *   "Current Draw"
  * ]
  */
-router.get("/stream-names", getStreamNames);
+router.get("/stream-names", authMiddleware, getStreamNames);
 
 /*
  * POST /filter-streams
@@ -75,7 +76,7 @@ router.get("/stream-names", getStreamNames);
  *    }
  * ] 
  */
-router.post('/filter-streams', postFilterStreams);
+router.post('/filter-streams', authMiddleware, postFilterStreams);
 
 /*
  * GET /data-profile
@@ -83,7 +84,7 @@ router.post('/filter-streams', postFilterStreams);
  * Description:
  * Returns dataset-level and per-stream quality summary (counts, missing rate, min/max/mean).
  */
-router.get('/data-profile', getDataProfileSummary);
+router.get('/data-profile', authMiddleware, getDataProfileSummary);
 
 /*
  * POST /top-correlated-pair
@@ -95,6 +96,6 @@ router.get('/data-profile', getDataProfileSummary);
  * Description:
  * Returns top correlated pair within provided stream names.
  */
-router.post('/top-correlated-pair', postTopCorrelatedPair);
+router.post('/top-correlated-pair', authMiddleware, postTopCorrelatedPair);
 
 module.exports = router;

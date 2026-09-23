@@ -126,28 +126,20 @@ function normaliseSelectedMetrics(request, fieldMap) {
   };
 }
 
-async function normaliseDatasetRequest(request, rows) {
+async function normaliseDatasetRequest(request, rows, dataset) {
   // Direct data batches are already required by the API contract to use
   // logical metric names, and have no persisted dataset mapping to resolve.
   if (Array.isArray(request.data)) {
     return { request, rows: normaliseRows(rows, request.dataset) };
   }
 
-  // Historical channel aliases carry the channel in their dataset name and do
-  // not need the active live dataset's persisted mapping.
-  const staticFieldMap = staticMappingForDataset(request.dataset);
-  if (Object.keys(staticFieldMap).length) {
-    return {
-      request: normaliseSelectedMetrics(request, staticFieldMap),
-      rows: normaliseRowsWithFieldMap(rows, staticFieldMap),
-    };
-  }
-
-  const mappings = await datasetRepository.findMappingsByName(request.dataset);
+  const mappings = dataset?.mappings || [];
   if (mappings.length) {
-    const channelId = request.dataset === 'thingspeak-live'
-      ? process.env.THINGSPEAK_CHANNEL_ID
-      : undefined;
+    const channelId =
+      /^thingspeak-(\d+)$/.exec(dataset.name)?.[1] ||
+      (dataset.name === 'thingspeak-live'
+        ? process.env.THINGSPEAK_CHANNEL_ID
+        : undefined);
     const fieldMap = fieldMapFromMappings(mappings, channelId);
     return {
       request: normaliseSelectedMetrics(request, fieldMap),
@@ -163,12 +155,12 @@ async function normaliseDatasetRequest(request, rows) {
   );
 }
 
-async function buildAnalyticsPayload(request, rows) {
+async function buildAnalyticsPayload(request, rows, dataset) {
   assertObject(request, 'Request body');
   assertObject(request.model, 'model');
   assertObject(request.correlation, 'correlation');
 
-  const normalised = await normaliseDatasetRequest(request, rows);
+  const normalised = await normaliseDatasetRequest(request, rows, dataset);
   request = normalised.request;
   rows = normalised.rows;
 
@@ -198,7 +190,7 @@ async function buildAnalyticsPayload(request, rows) {
   }
 
   return {
-    entity_id: request.entity_id ?? request.dataset ?? null,
+    entity_id: request.entity_id ?? dataset?.name ?? null,
     timestamp_col: 'timestamp',
     data,
     model: {
@@ -215,16 +207,19 @@ async function buildAnalyticsPayload(request, rows) {
   };
 }
 
-async function loadRows(request) {
+async function loadRows(request, userId) {
   if (Array.isArray(request.data)) return request.data;
-  if (typeof request.dataset !== 'string' || !request.dataset.trim()) {
-    throw new AnalysisServiceError('dataset is required when data is not supplied', {
+  if (!Number.isInteger(request.datasetId) || request.datasetId < 1) {
+    throw new AnalysisServiceError('datasetId must be a positive integer when data is not supplied', {
       status: 400,
       code: 'VALIDATION_ERROR',
     });
   }
 
-  const rows = await timeseriesService.getWideEntriesForDatasetName(request.dataset);
+  const rows = await timeseriesService.getWideEntriesForDatasetId(
+    request.datasetId,
+    userId,
+  );
   if (!rows) {
     throw new AnalysisServiceError('Dataset not found or contains no sensor data', {
       status: 404,
@@ -285,10 +280,23 @@ async function callAnalytics(payload) {
   return body;
 }
 
-async function runAnalysis(request) {
+async function runAnalysis(request, userId) {
   assertObject(request, 'Request body');
-  const rows = await loadRows(request);
-  const payload = await buildAnalyticsPayload(request, rows);
+  const rows = await loadRows(request, userId);
+  const dataset = Array.isArray(request.data)
+    ? null
+    : await datasetRepository.findById(
+      request.datasetId,
+      userId,
+      process.env.THINGSPEAK_DATASET_OWNER_ID,
+    );
+  if (!Array.isArray(request.data) && !dataset) {
+    throw new AnalysisServiceError('Dataset not found or contains no sensor data', {
+      status: 404,
+      code: 'DATASET_NOT_FOUND',
+    });
+  }
+  const payload = await buildAnalyticsPayload(request, rows, dataset);
   return callAnalytics(payload);
 }
 

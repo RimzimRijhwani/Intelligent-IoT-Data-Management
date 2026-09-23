@@ -17,14 +17,13 @@ const repositoryError = (code, status, message) =>
 
 class DatasetRepository {
   async findAll(status, userId, thingspeakOwnerId) {
+    if (!userId || !thingspeakOwnerId) return [];
     const whereClause =
       status === "deleted"
         ? "d.deleted_at IS NOT NULL AND d.deleted_at > CURRENT_TIMESTAMP - INTERVAL '15 days'"
         : "d.deleted_at IS NULL";
-    const accessClause = userId
-      ? "AND (d.created_by = $1 OR d.created_by = $2)"
-      : "";
-    const queryParams = userId ? [userId, thingspeakOwnerId] : [];
+    const accessClause = "AND (d.created_by = $1 OR d.created_by = $2)";
+    const queryParams = [userId, thingspeakOwnerId];
 
     const result = await db.query(
       `
@@ -64,10 +63,9 @@ class DatasetRepository {
   }
 
   async findById(id, userId, thingspeakOwnerId) {
-    const accessClause = userId
-      ? "AND (d.created_by = $2 OR d.created_by = $3)"
-      : "";
-    const queryParams = userId ? [id, userId, thingspeakOwnerId] : [id];
+    if (!userId || !thingspeakOwnerId) return null;
+    const accessClause = "AND (d.created_by = $2 OR d.created_by = $3)";
+    const queryParams = [id, userId, thingspeakOwnerId];
     const result = await db.query(
       `
       SELECT
@@ -123,22 +121,6 @@ class DatasetRepository {
       [name, userId],
     );
     return result.rows[0] || null;
-  }
-
-  async findMappingsByName(name) {
-    const result = await db.query(
-      `
-      SELECT
-        m.source_field AS "sourceField",
-        m.storage_field AS "storageField"
-      FROM datasets d
-      INNER JOIN dataset_field_mappings m ON m.dataset_id = d.id
-      WHERE d.name = $1
-      ORDER BY m.storage_field ASC
-      `,
-      [name],
-    );
-    return result.rows;
   }
 
   /**
