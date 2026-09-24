@@ -1,3 +1,8 @@
+import { authenticatedFetch } from './authClient';
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+
 export const runAnalysis = async ({
   datasetId,
   selectedStreams,
@@ -11,7 +16,7 @@ export const runAnalysis = async ({
   }
 
   const payload = {
-    dataset: datasetId,
+    datasetId: Number(datasetId),
     model: {
       metric: selectedStreams[0],
       detector: 'isolationforest',
@@ -25,7 +30,7 @@ export const runAnalysis = async ({
     },
   };
 
-  const response = await fetch('/api/analyse', {
+  const response = await authenticatedFetch(`${API_BASE_URL}/analyse`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

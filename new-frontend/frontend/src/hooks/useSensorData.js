@@ -4,7 +4,7 @@ import { getSensorData } from '../services/sensorService';
 export const useSensorData = (
   datasetId,
   useMock = false,
-  baseUrl = '/api'
+  baseUrl,
 ) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -98,13 +98,10 @@ export const useSensorData = (
         setIsEmpty(false);
         setIsValid(true);
 
-        const response = await getSensorData(
-          datasetId,
-          {
-            useMock,
-            baseUrl,
-          }
-        );
+        const response = await getSensorData(datasetId, {
+          useMock,
+          ...(baseUrl ? { baseUrl } : {}),
+        });
 
         if (!active) {
           return;

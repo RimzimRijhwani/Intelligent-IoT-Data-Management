@@ -8,11 +8,15 @@ import {
   errorResponse,
   insufficientDataResponse,
 } from '../data';
+import { authenticatedFetch } from './authClient';
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
 export const getSensorData = async (datasetId, options = {}) => {
   const {
     useMock = false,
-    baseUrl = '/api',
+    baseUrl = API_BASE_URL,
   } = options;
 
 
@@ -56,7 +60,7 @@ export const getSensorData = async (datasetId, options = {}) => {
     throw new Error('Dataset ID is required');
   }
 
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${baseUrl}/datasets/${encodeURIComponent(datasetId)}/series`
   );
 
@@ -102,33 +106,21 @@ export const getSensorData = async (datasetId, options = {}) => {
   let streams = [];
 
   try {
-    const datasetsResponse = await fetch(`${baseUrl}/datasets`);
+    const detailsResponse = await authenticatedFetch(
+      `${baseUrl}/datasets/${encodeURIComponent(datasetId)}`
+    );
 
-    if (datasetsResponse.ok) {
-      const datasets = await datasetsResponse.json();
+    if (detailsResponse.ok) {
+      const details = await detailsResponse.json();
 
-      const dataset = datasets.find(
-        (item) => item.name === datasetId
-      );
-
-      if (dataset) {
-        const detailsResponse = await fetch(
-          `${baseUrl}/datasets/${dataset.id}`
-        );
-
-        if (detailsResponse.ok) {
-          const details = await detailsResponse.json();
-
-          if (Array.isArray(details.mappings)) {
-            streams = details.mappings.map((mapping) => ({
-              id: mapping.storageField,
-              name:
-                mapping.displayName ||
-                mapping.name ||
-                mapping.storageField,
-            }));
-          }
-        }
+      if (Array.isArray(details.mappings)) {
+        streams = details.mappings.map((mapping) => ({
+          id: mapping.storageField,
+          name:
+            mapping.displayName ||
+            mapping.name ||
+            mapping.storageField,
+        }));
       }
     }
   } catch (error) {

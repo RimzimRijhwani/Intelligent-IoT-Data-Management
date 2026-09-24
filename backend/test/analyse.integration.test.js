@@ -1,6 +1,9 @@
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const test = require('node:test');
+const jwt = require('jsonwebtoken');
+
+process.env.JWT_SECRET ||= 'test-only-secret-not-for-production';
 
 const app = require('../src/app');
 const db = require('../src/db/pool');
@@ -11,6 +14,12 @@ const {
   normaliseRows,
 } = require('../src/services/analyseService');
 const { ensureThingSpeakDataset } = require('../src/services/thingspeakService');
+
+function authHeaders(userId = '11111111-1111-4111-8111-111111111111') {
+  return {
+    authorization: `Bearer ${jwt.sign({ sub: userId }, process.env.JWT_SECRET)}`,
+  };
+}
 
 function listen(server) {
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server.address().port)));
@@ -50,69 +59,61 @@ test('1350261 ThingSpeak rows use the documented canonical metric names', () => 
 });
 
 test('uploaded dataset selections and stored values use sourceField names', async () => {
-  const originalFindMappings = datasetRepository.findMappingsByName;
-  datasetRepository.findMappingsByName = async () => [
-    { storageField: 'field1', sourceField: 'AirTemperature' },
-    { storageField: 'field2', sourceField: 'RelativeHumidity' },
-  ];
+  const payload = await buildAnalyticsPayload(
+    {
+      datasetId: 42,
+      model: { metric: 'field1' },
+      correlation: { streams: ['field1', 'field2'] },
+    },
+    [{
+      created_at: '2026-04-28T15:25:15.000Z',
+      entry_id: 1,
+      field1: 16.7,
+      field2: null,
+    }],
+    {
+      name: 'microclimate-april',
+      mappings: [
+        { storageField: 'field1', sourceField: 'AirTemperature' },
+        { storageField: 'field2', sourceField: 'RelativeHumidity' },
+      ],
+    },
+  );
 
-  try {
-    const payload = await buildAnalyticsPayload(
-      {
-        dataset: 'microclimate-april',
-        model: { metric: 'field1' },
-        correlation: { streams: ['field1', 'field2'] },
-      },
-      [{
-        created_at: '2026-04-28T15:25:15.000Z',
-        entry_id: 1,
-        field1: 16.7,
-        field2: null,
-      }],
-    );
-
-    assert.deepEqual(payload, {
-      entity_id: 'microclimate-april',
-      timestamp_col: 'timestamp',
-      data: [{
-        timestamp: '2026-04-28T15:25:15.000Z',
-        AirTemperature: 16.7,
-        RelativeHumidity: null,
-      }],
-      model: { detector: 'isolationforest', metric: 'AirTemperature', parameters: {} },
-      correlation: {
-        streams: ['AirTemperature', 'RelativeHumidity'],
-        window_size: 20,
-        step_size: 10,
-        method: 'pearson',
-      },
-    });
-  } finally {
-    datasetRepository.findMappingsByName = originalFindMappings;
-  }
+  assert.deepEqual(payload, {
+    entity_id: 'microclimate-april',
+    timestamp_col: 'timestamp',
+    data: [{
+      timestamp: '2026-04-28T15:25:15.000Z',
+      AirTemperature: 16.7,
+      RelativeHumidity: null,
+    }],
+    model: { detector: 'isolationforest', metric: 'AirTemperature', parameters: {} },
+    correlation: {
+      streams: ['AirTemperature', 'RelativeHumidity'],
+      window_size: 20,
+      step_size: 10,
+      method: 'pearson',
+    },
+  });
 });
 
 test('dataset-first analysis rejects a selected stream with no mapping', async () => {
-  const originalFindMappings = datasetRepository.findMappingsByName;
-  datasetRepository.findMappingsByName = async () => [
-    { storageField: 'field1', sourceField: 'AirTemperature' },
-  ];
-
-  try {
-    await assert.rejects(
-      () => buildAnalyticsPayload(
-        {
-          dataset: 'microclimate-april',
-          model: { metric: 'field8' },
-          correlation: { streams: ['field1', 'field8'] },
-        },
-        [{ created_at: '2026-04-28T15:25:15.000Z', entry_id: 1, field1: 16.7 }],
-      ),
-      (error) => error.code === 'ANALYTICS_METRIC_UNMAPPED' && error.status === 400,
-    );
-  } finally {
-    datasetRepository.findMappingsByName = originalFindMappings;
-  }
+  await assert.rejects(
+    () => buildAnalyticsPayload(
+      {
+        datasetId: 42,
+        model: { metric: 'field8' },
+        correlation: { streams: ['field1', 'field8'] },
+      },
+      [{ created_at: '2026-04-28T15:25:15.000Z', entry_id: 1, field1: 16.7 }],
+      {
+        name: 'microclimate-april',
+        mappings: [{ storageField: 'field1', sourceField: 'AirTemperature' }],
+      },
+    ),
+    (error) => error.code === 'ANALYTICS_METRIC_UNMAPPED' && error.status === 400,
+  );
 });
 
 test('ThingSpeak live dataset is seeded with configured channel mappings', async () => {
@@ -204,6 +205,41 @@ test('ThingSpeak live dataset is seeded with configured channel mappings', async
   }
 });
 
+test('protected dataset, series, and analysis routes reject requests without an access token', async () => {
+  const backendServer = http.createServer(app);
+  const backendPort = await listen(backendServer);
+
+  try {
+    for (const [path, options] of [
+      ['/api/streams', {}],
+      ['/api/datasets', {}],
+      ['/api/datasets/42', {}],
+      ['/api/datasets/42/series', {}],
+      ['/api/analyse', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      }],
+    ]) {
+      const response = await fetch(`http://127.0.0.1:${backendPort}${path}`, options);
+      assert.equal(response.status, 401, path);
+      assert.equal((await response.json()).error.code, 'UNAUTHENTICATED');
+    }
+
+    const registerResponse = await fetch(
+      `http://127.0.0.1:${backendPort}/api/auth/register`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      },
+    );
+    assert.notEqual(registerResponse.status, 401);
+  } finally {
+    await close(backendServer);
+  }
+});
+
 test('POST /api/analyse normalises Backend data and returns the AIntl response', async () => {
   let receivedPayload;
   const analyticsServer = http.createServer((req, res) => {
@@ -227,19 +263,29 @@ test('POST /api/analyse normalises Backend data and returns the AIntl response',
   const backendServer = http.createServer(app);
   const backendPort = await listen(backendServer);
   const originalUrl = process.env.ANALYTICS_SERVICE_URL;
-  const originalSeriesLoader = timeseriesService.getWideEntriesForDatasetName;
+  const originalSeriesLoader = timeseriesService.getWideEntriesForDatasetId;
+  const originalFindById = datasetRepository.findById;
   process.env.ANALYTICS_SERVICE_URL = `http://127.0.0.1:${analyticsPort}`;
-  timeseriesService.getWideEntriesForDatasetName = async () => [
+  timeseriesService.getWideEntriesForDatasetId = async () => [
     { created_at: '2026-08-27T00:00:00.000Z', entry_id: 1, field3: '50.5', field4: '24.2', field6: '29.91' },
     { created_at: '2026-08-27T00:01:00.000Z', entry_id: 2, field3: '51.0', field4: '24.4', field6: '29.92' },
   ];
+  datasetRepository.findById = async () => ({
+    id: 42,
+    name: 'thingspeak-12397',
+    mappings: [
+      { storageField: 'field3', sourceField: 'humidity' },
+      { storageField: 'field4', sourceField: 'temperature' },
+      { storageField: 'field6', sourceField: 'pressure' },
+    ],
+  });
 
   try {
     const response = await fetch(`http://127.0.0.1:${backendPort}/api/analyse`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
-        dataset: 'thingspeak-12397',
+        datasetId: 42,
         model: { metric: 'temperature' },
         correlation: { streams: ['temperature', 'humidity'] },
       }),
@@ -260,7 +306,8 @@ test('POST /api/analyse normalises Backend data and returns the AIntl response',
       correlation: { streams: ['temperature', 'humidity'], window_size: 20, step_size: 10, method: 'pearson' },
     });
   } finally {
-    timeseriesService.getWideEntriesForDatasetName = originalSeriesLoader;
+    timeseriesService.getWideEntriesForDatasetId = originalSeriesLoader;
+    datasetRepository.findById = originalFindById;
     if (originalUrl === undefined) delete process.env.ANALYTICS_SERVICE_URL;
     else process.env.ANALYTICS_SERVICE_URL = originalUrl;
     await close(backendServer);
@@ -277,7 +324,7 @@ test('POST /api/analyse returns an actionable unavailable error when AIntl canno
   try {
     const response = await fetch(`http://127.0.0.1:${backendPort}/api/analyse`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
         data: [
           { timestamp: '2026-08-27T00:00:00.000Z', temperature: 24.2, humidity: 50.5 },

@@ -11,24 +11,11 @@ const {
 } = require('../controllers/datasetsController');
 const authMiddleware = require('../middleware/authMiddleware');
 
-// TODO(FE auth migration): Reapply authMiddleware to these read routes after
-// the frontend sends Bearer tokens for dataset reads. It must keep `dataset.id`
-// (not `dataset.name`) as the dashboard route value at the same time.
 // GET /api/datasets
-router.get(
-  '/datasets',
-  (req, res, next) => {
-    if (req.query.status === 'deleted') {
-      return authMiddleware(req, res, next);
-    }
-
-    return next();
-  },
-  getAllDatasets,
-);
+router.get('/datasets', authMiddleware, getAllDatasets);
 
 // GET /api/datasets/:id
-router.get('/datasets/:id', getDatasetById);
+router.get('/datasets/:id', authMiddleware, getDatasetById);
 
 // POST /api/datasets
 router.post('/datasets', authMiddleware, createDataset);

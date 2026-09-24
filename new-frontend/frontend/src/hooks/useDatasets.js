@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { authenticatedFetch } from "../services/authClient";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
@@ -16,8 +17,8 @@ const formatUpdatedTime = (value) => {
 };
 
 const buildDatasetCard = (dataset) => ({
-  id: dataset.name,       // keep for existing dashboard routing
-  datasetId: dataset.id,  // numeric DB ID for delete/restore/API operations
+  id: dataset.id,
+  datasetId: dataset.id,
   name:
     dataset.name === "thingspeak-live"
       ? "ThingSpeak Live"
@@ -49,7 +50,7 @@ export const useDatasets = () => {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/datasets`);
+      const response = await authenticatedFetch(`${API_BASE_URL}/datasets`);
 
       if (!response.ok) {
         throw new Error(
@@ -65,7 +66,7 @@ export const useDatasets = () => {
 
       const detailedDatasets = await Promise.all(
         datasetList.map(async (dataset) => {
-          const detailResponse = await fetch(
+          const detailResponse = await authenticatedFetch(
             `${API_BASE_URL}/datasets/${dataset.id}`
           );
 

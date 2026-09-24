@@ -15,7 +15,7 @@ const analyseService = require('../services/analyseService');
  */
 const analyse = async (req, res) => {
   try {
-    const result = await analyseService.runAnalysis(req.body);
+    const result = await analyseService.runAnalysis(req.body, req.user.sub);
     return res.status(200).json(result);
   } catch (err) {
     console.error('Error analysing data:', err);
